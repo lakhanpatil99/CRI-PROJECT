@@ -1,0 +1,2681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Bosch Fuel Injector — 3D Interactive Explorer</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Titillium+Web:ital,wght@0,300;0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
+<style>
+/* ============================================================
+   ROOT TOKENS
+============================================================ */
+:root{
+  --blue:#0091D8;
+  --blue-bright:#3FC1FF;
+  --blue-deep:#004A7C;
+  --red:#E2001A;
+  --red-bright:#FF3B4E;
+  --bg-0:#050A10;
+  --bg-1:#0A121B;
+  --bg-2:#0F1B27;
+  --glass:rgba(255,255,255,0.045);
+  --glass-strong:rgba(255,255,255,0.075);
+  --glass-border:rgba(255,255,255,0.09);
+  --text-0:#EEF4FA;
+  --text-1:#AFC2D4;
+  --text-2:#6E8298;
+  --steel:#c7d2db;
+  --radius-lg:20px;
+  --radius-md:14px;
+  --radius-sm:8px;
+  --font-display:'Rajdhani', sans-serif;
+  --font-body:'Titillium Web', sans-serif;
+  --ease-out: cubic-bezier(.16,.84,.44,1);
+}
+body.light-mode{
+  --bg-0:#EEF2F6;
+  --bg-1:#E4EAF0;
+  --bg-2:#D9E1E9;
+  --glass:rgba(255,255,255,0.55);
+  --glass-strong:rgba(255,255,255,0.75);
+  --glass-border:rgba(10,30,50,0.10);
+  --text-0:#0B1620;
+  --text-1:#3A4C5C;
+  --text-2:#6E8298;
+}
+
+*{ box-sizing:border-box; margin:0; padding:0; }
+html{ scroll-behavior:smooth; }
+body{
+  font-family:var(--font-body);
+  background:var(--bg-0);
+  color:var(--text-0);
+  overflow-x:hidden;
+  transition:background .5s var(--ease-out), color .5s var(--ease-out);
+}
+::selection{ background:var(--blue); color:#fff; }
+::-webkit-scrollbar{ width:8px; height:8px; }
+::-webkit-scrollbar-track{ background:transparent; }
+::-webkit-scrollbar-thumb{ background:var(--glass-border); border-radius:10px; }
+
+a{ color:inherit; text-decoration:none; }
+button{ font-family:var(--font-body); cursor:pointer; }
+
+.glass{
+  background:var(--glass);
+  backdrop-filter:blur(18px) saturate(140%);
+  -webkit-backdrop-filter:blur(18px) saturate(140%);
+  border:1px solid var(--glass-border);
+  box-shadow:0 8px 32px rgba(0,0,0,0.35);
+}
+
+/* ============================================================
+   NAV
+============================================================ */
+#nav{
+  position:fixed; top:0; left:0; right:0; z-index:100;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:18px 40px;
+  background:linear-gradient(to bottom, rgba(5,10,16,0.85), transparent);
+  transition:background .4s;
+}
+body.light-mode #nav{ background:linear-gradient(to bottom, rgba(238,242,246,0.9), transparent); }
+.nav-logo{
+  font-family:var(--font-display); font-weight:700; letter-spacing:6px;
+  font-size:20px; display:flex; align-items:center; gap:10px;
+}
+.nav-logo .dot{ width:9px; height:9px; border-radius:50%; background:var(--red); box-shadow:0 0 12px var(--red); }
+.nav-links{ display:flex; gap:34px; font-size:14px; letter-spacing:1px; font-weight:600; }
+.nav-links a{ opacity:.75; transition:opacity .25s, color .25s; position:relative; }
+.nav-links a:hover{ opacity:1; color:var(--blue-bright); }
+.nav-actions{ display:flex; gap:10px; align-items:center; }
+.icon-btn{
+  width:38px; height:38px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center;
+  background:var(--glass); border:1px solid var(--glass-border);
+  color:var(--text-0); font-size:14px; transition:all .25s var(--ease-out);
+}
+.icon-btn:hover{ background:var(--blue); border-color:var(--blue); color:#fff; transform:translateY(-2px); }
+
+/* ============================================================
+   HERO
+============================================================ */
+#hero{
+  position:relative; min-height:100vh; display:flex; flex-direction:column;
+  align-items:center; justify-content:center; text-align:center;
+  padding:120px 20px 60px;
+  overflow:hidden;
+  background:radial-gradient(ellipse at 50% 20%, #0d1c2a 0%, var(--bg-0) 60%);
+}
+#bg-particles{ position:absolute; inset:0; width:100%; height:100%; z-index:0; opacity:.7; }
+.hero-inner{ position:relative; z-index:2; max-width:920px; }
+.eyebrow{
+  display:inline-flex; align-items:center; gap:10px;
+  font-family:var(--font-display); font-size:13px; font-weight:600;
+  letter-spacing:4px; color:var(--blue-bright);
+  padding:8px 18px; border-radius:30px;
+  margin-bottom:26px;
+}
+.eyebrow::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--blue-bright); box-shadow:0 0 10px var(--blue-bright); }
+.hero-title{
+  font-family:var(--font-display); font-weight:700;
+  font-size:clamp(38px, 6vw, 78px); line-height:1.03; letter-spacing:-1px;
+  background:linear-gradient(120deg, #fff 30%, var(--blue-bright) 65%, var(--red-bright) 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  text-shadow:0 0 60px rgba(63,193,255,0.15);
+}
+.hero-sub{
+  margin:22px auto 0; max-width:600px; font-size:18px; line-height:1.6;
+  color:var(--text-1); font-weight:300;
+}
+.hero-actions{ margin-top:44px; display:flex; flex-wrap:wrap; gap:14px; justify-content:center; }
+.btn{
+  font-family:var(--font-display); font-weight:600; letter-spacing:1px; font-size:14.5px;
+  padding:14px 26px; border-radius:12px; border:1px solid var(--glass-border);
+  display:inline-flex; align-items:center; gap:10px;
+  transition:transform .3s var(--ease-out), box-shadow .3s var(--ease-out), background .3s, border-color .3s;
+  background:var(--glass); color:var(--text-0);
+}
+.btn:hover{ transform:translateY(-3px); }
+.btn.primary{ background:linear-gradient(135deg, var(--blue), var(--blue-deep)); border-color:transparent; box-shadow:0 8px 30px rgba(0,145,216,0.35); }
+.btn.primary:hover{ box-shadow:0 12px 40px rgba(0,145,216,0.5); }
+.btn.accent{ background:linear-gradient(135deg, var(--red), #9c0012); border-color:transparent; box-shadow:0 8px 30px rgba(226,0,26,0.3); }
+.btn.accent:hover{ box-shadow:0 12px 40px rgba(226,0,26,0.45); }
+.btn.ghost:hover{ border-color:var(--blue); color:var(--blue-bright); }
+.btn.active{ background:var(--blue); border-color:var(--blue); color:#fff; }
+
+.hero-cards{
+  display:flex; gap:16px; margin-top:70px; flex-wrap:wrap; justify-content:center;
+}
+.hero-card{
+  width:190px; padding:20px; border-radius:var(--radius-md); text-align:left;
+}
+.hero-card i{ color:var(--blue-bright); font-size:20px; margin-bottom:12px; display:block; }
+.hero-card h4{ font-family:var(--font-display); font-size:15px; letter-spacing:.5px; margin-bottom:6px; }
+.hero-card p{ font-size:12.5px; color:var(--text-2); line-height:1.5; }
+
+.scroll-cue{ position:absolute; bottom:26px; left:50%; transform:translateX(-50%); z-index:2; color:var(--text-2); font-size:12px; letter-spacing:3px; display:flex; flex-direction:column; align-items:center; gap:8px;}
+.scroll-cue .line{ width:1px; height:34px; background:linear-gradient(var(--blue-bright), transparent); animation:scrollLine 2s infinite; }
+@keyframes scrollLine{ 0%{opacity:0; transform:scaleY(0);} 40%{opacity:1; transform:scaleY(1);} 100%{opacity:0; transform-origin:bottom; transform:scaleY(0);} }
+
+/* ============================================================
+   EXPLORER SECTION
+============================================================ */
+#explorer{
+  position:relative; padding:60px 24px 40px; min-height:100vh;
+}
+.section-heading{ text-align:center; max-width:640px; margin:0 auto 30px; }
+.section-heading .tag{ font-family:var(--font-display); letter-spacing:4px; font-size:12px; color:var(--red-bright); font-weight:700; }
+.section-heading h2{ font-family:var(--font-display); font-size:clamp(26px,4vw,40px); margin-top:8px; }
+.section-heading p{ color:var(--text-2); margin-top:10px; font-size:15px; }
+
+.explorer-grid{
+  display:grid;
+  grid-template-columns:250px 1fr 320px;
+  gap:16px;
+  max-width:1500px; margin:0 auto;
+  height:min(78vh, 760px);
+}
+
+/* ---- Sidebar ---- */
+#sidebar{
+  border-radius:var(--radius-lg); padding:18px; display:flex; flex-direction:column; overflow:hidden;
+}
+.sidebar-title{ font-family:var(--font-display); font-weight:700; letter-spacing:2px; font-size:13px; color:var(--text-1); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;}
+.search-box{ position:relative; margin-bottom:14px; }
+.search-box input{
+  width:100%; padding:11px 14px 11px 36px; border-radius:10px; border:1px solid var(--glass-border);
+  background:rgba(255,255,255,0.04); color:var(--text-0); font-family:var(--font-body); font-size:13.5px; outline:none;
+  transition:border-color .25s, background .25s;
+}
+.search-box input:focus{ border-color:var(--blue); background:rgba(255,255,255,0.07); }
+.search-box i{ position:absolute; left:13px; top:50%; transform:translateY(-50%); color:var(--text-2); font-size:13px; }
+#parts-list{ overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:4px; padding-right:4px;}
+.part-row{
+  display:flex; align-items:center; gap:10px; padding:9px 10px; border-radius:9px;
+  font-size:13px; color:var(--text-1); cursor:pointer; border:1px solid transparent;
+  transition:all .2s var(--ease-out);
+}
+.part-row .dot{ width:7px; height:7px; border-radius:50%; background:var(--text-2); flex-shrink:0; transition:.2s;}
+.part-row:hover{ background:var(--glass-strong); color:var(--text-0); }
+.part-row.active{ background:linear-gradient(90deg, rgba(0,145,216,0.25), rgba(0,145,216,0.03)); color:#fff; border-color:rgba(0,145,216,0.4); }
+.part-row.active .dot{ background:var(--blue-bright); box-shadow:0 0 8px var(--blue-bright); }
+.part-row.dimmed{ opacity:.3; }
+.part-row .vis-toggle{ margin-left:auto; opacity:.5; font-size:11px; padding:4px; }
+.part-row .vis-toggle:hover{ opacity:1; color:var(--blue-bright); }
+
+/* ---- Viewer ---- */
+#viewer-wrap{ position:relative; border-radius:var(--radius-lg); overflow:hidden; border:1px solid var(--glass-border); background:radial-gradient(ellipse at 50% 30%, #0e1a26 0%, #060a0f 75%);}
+body.light-mode #viewer-wrap{ background:radial-gradient(ellipse at 50% 30%, #dfe8f0 0%, #c8d4de 75%); }
+#three-canvas{ position:absolute; inset:0; width:100%; height:100%; display:block; touch-action:none; }
+#labels-layer{ position:absolute; inset:0; pointer-events:none; z-index:5; }
+.part-label{
+  position:absolute; transform:translate(-50%,-100%); pointer-events:none;
+  font-family:var(--font-display); font-size:11.5px; font-weight:600; letter-spacing:.5px;
+  padding:4px 9px; border-radius:6px; white-space:nowrap;
+  background:rgba(6,12,18,0.72); border:1px solid rgba(63,193,255,0.35); color:#fff;
+  opacity:0; transition:opacity .3s;
+}
+.part-label.visible{ opacity:1; }
+#leader-lines{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:4; }
+#leader-lines line{ stroke:rgba(63,193,255,0.55); stroke-width:1; }
+
+#viewer-toolbar{
+  position:absolute; top:14px; left:14px; right:14px; display:flex; justify-content:space-between; gap:10px; z-index:10; flex-wrap:wrap;
+}
+.tool-group{ display:flex; gap:6px; padding:6px; border-radius:12px; background:rgba(6,12,18,0.55); backdrop-filter:blur(10px); border:1px solid var(--glass-border); }
+.tool-btn{
+  width:34px; height:34px; border-radius:8px; border:none; background:transparent; color:var(--text-1);
+  display:flex; align-items:center; justify-content:center; font-size:13px; transition:all .2s;
+}
+.tool-btn:hover{ background:rgba(255,255,255,0.08); color:#fff; }
+.tool-btn.active{ background:var(--blue); color:#fff; }
+
+#viewer-caption{
+  position:absolute; bottom:14px; left:14px; right:14px; display:flex; justify-content:space-between; align-items:flex-end; z-index:10; pointer-events:none;
+}
+#viewer-caption .hint{ font-size:11px; color:var(--text-2); background:rgba(6,12,18,0.5); padding:6px 10px; border-radius:8px; pointer-events:auto;}
+#crosshair-readout{ font-family:var(--font-display); font-size:12px; color:var(--blue-bright); background:rgba(6,12,18,0.6); padding:6px 12px; border-radius:8px; display:none; }
+
+/* ---- Info panel ---- */
+#info-panel{
+  border-radius:var(--radius-lg); padding:22px; overflow-y:auto; display:flex; flex-direction:column;
+  transform:translateX(30px); opacity:0; pointer-events:none; transition:opacity .4s var(--ease-out), transform .4s var(--ease-out);
+}
+#info-panel.visible{ transform:translateX(0); opacity:1; pointer-events:auto; }
+#info-panel .ip-empty{ margin:auto; text-align:center; color:var(--text-2); }
+#info-panel .ip-empty i{ font-size:30px; margin-bottom:14px; color:var(--blue-deep); display:block;}
+.ip-header{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;}
+.ip-tag{ font-family:var(--font-display); font-size:11px; letter-spacing:3px; color:var(--red-bright); font-weight:700;}
+.ip-title{ font-family:var(--font-display); font-size:23px; font-weight:700; margin-top:4px; line-height:1.15;}
+.ip-close{ width:28px;height:28px;border-radius:50%;background:var(--glass); border:1px solid var(--glass-border); flex-shrink:0; color:var(--text-1); font-size:12px;}
+.ip-close:hover{ background:var(--red); color:#fff; }
+.ip-field{ margin-top:16px; padding-top:14px; border-top:1px solid var(--glass-border); }
+.ip-field h5{ font-family:var(--font-display); font-size:11.5px; letter-spacing:2px; color:var(--blue-bright); margin-bottom:6px; text-transform:uppercase; display:flex; align-items:center; gap:7px;}
+.ip-field p{ font-size:13px; line-height:1.65; color:var(--text-1); font-weight:300; }
+
+/* ============================================================
+   LEARNING MODE
+============================================================ */
+#learning-section{ padding:80px 24px; max-width:1100px; margin:0 auto; }
+#learning-panel{ border-radius:var(--radius-lg); padding:26px; }
+.lp-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; flex-wrap:wrap; gap:14px;}
+.lp-steps-nav{ display:flex; gap:8px; }
+.step-dot{ width:34px; height:6px; border-radius:4px; background:var(--glass-border); cursor:pointer; transition:.25s; }
+.step-dot.active{ background:var(--blue); box-shadow:0 0 10px var(--blue); }
+.step-dot.done{ background:var(--blue-deep); }
+.lp-body{ display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:center; min-height:260px; }
+.lp-visual{ position:relative; border-radius:16px; overflow:hidden; height:260px; background:linear-gradient(135deg, #0c1620, #060a10); display:flex; align-items:center; justify-content:center; border:1px solid var(--glass-border);}
+.lp-visual .step-num{ font-family:var(--font-display); font-size:90px; font-weight:700; opacity:.14; position:absolute; }
+.lp-visual i{ font-size:52px; color:var(--blue-bright); z-index:2; filter:drop-shadow(0 0 18px rgba(63,193,255,0.5)); }
+.lp-text .step-eyebrow{ font-family:var(--font-display); font-size:12px; letter-spacing:3px; color:var(--red-bright); font-weight:700; }
+.lp-text h3{ font-family:var(--font-display); font-size:26px; margin-top:8px; }
+.lp-text p{ margin-top:12px; color:var(--text-1); line-height:1.7; font-size:14.5px; }
+.lp-controls{ display:flex; justify-content:space-between; margin-top:22px; align-items:center;}
+.lp-btns{ display:flex; gap:10px; }
+
+/* ============================================================
+   FOOTER
+============================================================ */
+#footer{
+  padding:60px 24px 36px; text-align:center; border-top:1px solid var(--glass-border); margin-top:40px;
+}
+#footer .foot-title{ font-family:var(--font-display); font-weight:700; letter-spacing:3px; font-size:15px; color:var(--text-1);}
+.foot-social{ display:flex; justify-content:center; gap:14px; margin:22px 0; }
+.foot-social a{
+  width:40px; height:40px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  background:var(--glass); border:1px solid var(--glass-border); transition:all .3s var(--ease-out);
+}
+.foot-social a:hover{ background:var(--blue); transform:translateY(-4px) rotate(8deg); box-shadow:0 8px 22px rgba(0,145,216,0.4);}
+#footer .copy{ color:var(--text-2); font-size:12px; margin-top:16px; }
+
+/* ============================================================
+   MISC / RESPONSIVE
+============================================================ */
+.hidden{ display:none !important; }
+#toast{
+  position:fixed; bottom:26px; left:50%; transform:translateX(-50%) translateY(20px); z-index:999;
+  padding:12px 22px; border-radius:12px; font-size:13px; font-weight:600;
+  opacity:0; pointer-events:none; transition:all .35s var(--ease-out);
+}
+#toast.show{ opacity:1; transform:translateX(-50%) translateY(0); }
+
+@media (max-width: 1100px){
+  .explorer-grid{ grid-template-columns:1fr; height:auto; }
+  #sidebar{ height:220px; order:2; }
+  #viewer-wrap{ height:56vh; order:1; }
+  #info-panel{ order:3; height:auto; max-height:420px; transform:none; }
+  .lp-body{ grid-template-columns:1fr; }
+  .nav-links{ display:none; }
+  #contam-panel{ width:280px; right:8px; max-height:90vh; font-size:11px; }
+}
+
+/* ============================================================
+   CONTAMINATION PANEL
+============================================================ */
+#contam-panel{
+  position:absolute; top:60px; right:14px; z-index:50;
+  width:310px; max-height:calc(100vh - 120px);
+  overflow-y:auto; border-radius:var(--radius-md);
+  padding:0; display:none; flex-direction:column;
+  font-size:12px;
+  animation: contam-slide-in 0.35s var(--ease-out);
+}
+#contam-panel.open{ display:flex; }
+@keyframes contam-slide-in{
+  from{ opacity:0; transform:translateX(20px); }
+  to{ opacity:1; transform:translateX(0); }
+}
+.cp-header{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 16px 10px; border-bottom:1px solid var(--glass-border);
+}
+.cp-header h3{ font-family:var(--font-display); font-size:14px; letter-spacing:2px; font-weight:700; margin:0; }
+.cp-close{
+  width:26px; height:26px; border-radius:50%; border:1px solid var(--glass-border);
+  background:transparent; color:var(--text-1); font-size:12px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; transition:all .2s;
+}
+.cp-close:hover{ background:var(--red); color:#fff; border-color:var(--red); }
+.cp-section{ padding:10px 16px; border-bottom:1px solid var(--glass-border); }
+.cp-section:last-child{ border-bottom:none; }
+.cp-label{ font-size:10px; letter-spacing:1.5px; font-weight:600; color:var(--text-2); margin-bottom:8px; text-transform:uppercase; }
+
+/* Preset grid */
+.cp-presets{ display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.cp-preset{
+  display:flex; align-items:center; gap:8px;
+  padding:7px 10px; border-radius:var(--radius-sm); cursor:pointer;
+  border:1px solid var(--glass-border); background:transparent;
+  color:var(--text-0); font-size:11px; font-family:var(--font-body);
+  transition:all .2s var(--ease-out);
+}
+.cp-preset:hover{ background:var(--glass-strong); transform:translateY(-1px); }
+.cp-preset.active{ border-color:var(--blue); background:rgba(0,145,216,0.12); }
+.cp-preset i{ font-size:13px; width:18px; text-align:center; }
+
+/* Sliders */
+.cp-slider-row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; }
+.cp-slider-row label{ font-size:11px; color:var(--text-1); }
+.cp-slider-row .cp-val{ font-size:11px; color:var(--blue-bright); font-weight:600; min-width:36px; text-align:right; }
+.cp-slider-row input[type=range]{
+  flex:1; margin:0 10px; height:4px; -webkit-appearance:none; appearance:none;
+  background:var(--glass-strong); border-radius:4px; outline:none;
+}
+.cp-slider-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none; width:14px; height:14px; border-radius:50%;
+  background:var(--blue); border:2px solid var(--bg-0); cursor:pointer;
+}
+
+/* Control buttons */
+.cp-controls{ display:flex; gap:6px; flex-wrap:wrap; }
+.cp-btn{
+  flex:1; min-width:60px; padding:7px 0; border-radius:var(--radius-sm);
+  font-family:var(--font-body); font-size:11px; font-weight:600;
+  border:1px solid var(--glass-border); background:transparent;
+  color:var(--text-0); cursor:pointer; transition:all .2s;
+  display:flex; align-items:center; justify-content:center; gap:5px;
+}
+.cp-btn:hover{ background:var(--glass-strong); }
+.cp-btn.primary{ background:var(--blue); border-color:var(--blue); color:#fff; }
+.cp-btn.primary:hover{ background:var(--blue-bright); }
+.cp-btn.accent{ background:rgba(34,197,94,0.15); border-color:rgba(34,197,94,0.3); color:#22C55E; }
+.cp-btn.accent:hover{ background:rgba(34,197,94,0.25); }
+.cp-btn.warn{ border-color:rgba(234,179,8,0.3); color:#EAB308; }
+
+/* Dashboard */
+.cp-dashboard{ display:grid; grid-template-columns:1fr 1fr; gap:4px 12px; }
+.cp-stat{ display:flex; justify-content:space-between; align-items:center; padding:3px 0; }
+.cp-stat-label{ font-size:10px; color:var(--text-2); }
+.cp-stat-val{ font-size:12px; font-weight:600; font-family:var(--font-display); }
+.cp-health-bar{
+  grid-column:1/-1; height:6px; border-radius:3px; background:var(--glass-strong);
+  margin-top:4px; overflow:hidden;
+}
+.cp-health-fill{ height:100%; border-radius:3px; background:#22C55E; transition:width .5s, background .5s; width:100%; }
+</style>
+</head>
+
+<body>
+
+<!-- ============================================================
+     NAVIGATION
+============================================================ -->
+<nav id="nav">
+  <div class="nav-logo"><span class="dot"></span>BOSCH<span style="font-weight:300; opacity:.6; letter-spacing:2px;">&nbsp;/&nbsp;INJECTOR LAB</span></div>
+  <div class="nav-links">
+    <a href="#hero">Overview</a>
+    <a href="#explorer">Explorer</a>
+    <a href="#learning-section">Learning</a>
+  </div>
+  <div class="nav-actions">
+    <button class="icon-btn" id="theme-toggle" title="Toggle light / dark mode"><i class="fa-solid fa-moon"></i></button>
+    <button class="icon-btn" id="fullscreen-toggle" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
+  </div>
+</nav>
+
+<!-- ============================================================
+     HERO
+============================================================ -->
+<section id="hero">
+  <canvas id="bg-particles"></canvas>
+  <div class="hero-inner">
+    <div class="eyebrow">PRECISION FUEL SYSTEMS ENGINEERING</div>
+    <h1 class="hero-title">Bosch Fuel Injector<br/>3D Interactive Explorer</h1>
+    <p class="hero-sub">Explore every internal component of a Bosch fuel injector in real time — rotate, dissect, and learn how modern common-rail injection delivers fuel with micron-level precision.</p>
+    <div class="hero-actions">
+      <button class="btn primary" id="btn-explore"><i class="fa-solid fa-cube"></i> Explore Injector</button>
+      <button class="btn accent" id="btn-exploded-hero"><i class="fa-solid fa-arrows-split-up-and-left"></i> Exploded View</button>
+      <button class="btn ghost" id="btn-reset-hero"><i class="fa-solid fa-arrows-rotate"></i> Reset View</button>
+      <button class="btn ghost" id="btn-autorotate-hero"><i class="fa-solid fa-rotate"></i> Auto Rotate</button>
+    </div>
+    <div class="hero-cards">
+      <div class="hero-card glass"><i class="fa-solid fa-bolt"></i><h4>Solenoid Driven</h4><p>Electromagnetic actuation lifts the needle in microseconds.</p></div>
+      <div class="hero-card glass"><i class="fa-solid fa-gauge-high"></i><h4>High Pressure</h4><p>Common-rail pressures exceeding 2,000 bar.</p></div>
+      <div class="hero-card glass"><i class="fa-solid fa-droplet"></i><h4>Atomized Spray</h4><p>Multi-hole nozzle tip produces fine fuel atomization.</p></div>
+    </div>
+  </div>
+  <div class="scroll-cue"><span>SCROLL</span><span class="line"></span></div>
+</section>
+
+<!-- ============================================================
+     EXPLORER
+============================================================ -->
+<section id="explorer">
+  <div class="section-heading">
+    <div class="tag">COMPONENT EXPLORER</div>
+    <h2>Every Part, Fully Interactive</h2>
+    <p>Click, search, or select any of the 21 components to inspect Bosch engineering detail.</p>
+  </div>
+
+  <div class="explorer-grid">
+
+    <!-- SIDEBAR -->
+    <aside id="sidebar" class="glass">
+      <div class="sidebar-title">COMPONENTS <span id="parts-count" style="color:var(--text-2); font-weight:400;">21</span></div>
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass"></i>
+        <input type="text" id="search-input" placeholder="Search e.g. needle, spring, filter…" autocomplete="off"/>
+      </div>
+      <div id="parts-list"></div>
+    </aside>
+
+    <!-- VIEWER -->
+    <div id="viewer-wrap">
+      <canvas id="three-canvas"></canvas>
+      <div id="labels-layer"></div>
+      <svg id="leader-lines"></svg>
+
+      <div id="viewer-toolbar">
+        <div class="tool-group">
+          <button class="tool-btn" id="tb-exploded" title="Exploded View"><i class="fa-solid fa-arrows-split-up-and-left"></i></button>
+          <button class="tool-btn" id="tb-reset" title="Reset Camera"><i class="fa-solid fa-arrows-rotate"></i></button>
+          <button class="tool-btn" id="tb-autorotate" title="Auto Rotate"><i class="fa-solid fa-rotate"></i></button>
+          <button class="tool-btn" id="tb-labels" title="Toggle Labels"><i class="fa-solid fa-tags"></i></button>
+        </div>
+        <div class="tool-group">
+          <button class="tool-btn" id="tb-wireframe" title="Wireframe Mode"><i class="fa-solid fa-diagram-project"></i></button>
+          <button class="tool-btn" id="tb-transparent" title="Transparent Mode"><i class="fa-solid fa-eye-low-vision"></i></button>
+          <button class="tool-btn" id="tb-crosssection" title="Cross Section Mode"><i class="fa-solid fa-scissors"></i></button>
+          <button class="tool-btn" id="tb-measure" title="Measurement Mode"><i class="fa-solid fa-ruler"></i></button>
+        </div>
+        <div class="tool-group">
+          <button class="tool-btn" id="tb-flow" title="Toggle Fuel Flow Animation"><i class="fa-solid fa-droplet"></i></button>
+          <button class="tool-btn" id="tb-contamination" title="Contamination Simulator"><i class="fa-solid fa-flask-vial"></i></button>
+          <button class="tool-btn" id="tb-screenshot" title="Screenshot"><i class="fa-solid fa-camera"></i></button>
+          <button class="tool-btn" id="tb-fullscreen" title="Fullscreen"><i class="fa-solid fa-expand"></i></button>
+        </div>
+      </div>
+
+      <div id="viewer-caption">
+        <div class="hint" id="viewer-hint">Drag to rotate · Scroll to zoom · Click a component to inspect</div>
+        <div id="crosshair-readout"></div>
+      </div>
+
+      <!-- CONTAMINATION SIMULATOR PANEL -->
+      <div id="contam-panel" class="glass">
+        <div class="cp-header">
+          <h3>CONTAMINATION</h3>
+          <button class="cp-close" id="cp-close" title="Close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="cp-section">
+          <div class="cp-label">Scenarios</div>
+          <div class="cp-presets" id="cp-presets"></div>
+        </div>
+
+        <div class="cp-section">
+          <div class="cp-label">Controls</div>
+          <div class="cp-slider-row">
+            <label>Size</label>
+            <input type="range" id="cp-size" min="50" max="200" value="100">
+            <span class="cp-val" id="cp-size-val">1.0×</span>
+          </div>
+          <div class="cp-slider-row">
+            <label>Contamination</label>
+            <input type="range" id="cp-level" min="0" max="100" value="40">
+            <span class="cp-val" id="cp-level-val">40%</span>
+          </div>
+          <div class="cp-slider-row">
+            <label>Sim Speed</label>
+            <input type="range" id="cp-speed" min="25" max="400" value="100">
+            <span class="cp-val" id="cp-speed-val">1.0×</span>
+          </div>
+        </div>
+
+        <div class="cp-section">
+          <div class="cp-controls">
+            <button class="cp-btn primary" id="cp-start"><i class="fa-solid fa-play"></i> Start</button>
+            <button class="cp-btn warn" id="cp-pause"><i class="fa-solid fa-pause"></i> Pause</button>
+            <button class="cp-btn" id="cp-reset"><i class="fa-solid fa-rotate-left"></i></button>
+          </div>
+          <div class="cp-controls" style="margin-top:6px;">
+            <button class="cp-btn accent" id="cp-clean"><i class="fa-solid fa-broom"></i> Clean Injector</button>
+            <button class="cp-btn" id="cp-trace"><i class="fa-solid fa-route"></i> Trace</button>
+          </div>
+        </div>
+
+        <div class="cp-section">
+          <div class="cp-label">Live Dashboard</div>
+          <div class="cp-dashboard">
+            <div class="cp-stat"><span class="cp-stat-label">Particles</span><span class="cp-stat-val" id="cp-d-particles">0</span></div>
+            <div class="cp-stat"><span class="cp-stat-label">Flow Rate</span><span class="cp-stat-val" id="cp-d-flow">100%</span></div>
+            <div class="cp-stat"><span class="cp-stat-label">Blockage</span><span class="cp-stat-val" id="cp-d-blockage">0%</span></div>
+            <div class="cp-stat"><span class="cp-stat-label">Health</span><span class="cp-stat-val" id="cp-d-health" style="color:#22C55E">100%</span></div>
+            <div class="cp-stat"><span class="cp-stat-label">Affected</span><span class="cp-stat-val" id="cp-d-affected">—</span></div>
+            <div class="cp-stat"><span class="cp-stat-label">Status</span><span class="cp-stat-val" id="cp-d-mode">Normal</span></div>
+            <div class="cp-health-bar"><div class="cp-health-fill" id="cp-health-fill"></div></div>
+            <div class="cp-stat" style="grid-column:1/-1"><span class="cp-stat-label">Sim Time</span><span class="cp-stat-val" id="cp-d-time">00:00</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INFO PANEL -->
+    <div id="info-panel" class="glass">
+      <div class="ip-empty">
+        <i class="fa-solid fa-cube"></i>
+        <p>Select a component from the model or sidebar<br/>to view detailed engineering data.</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- ============================================================
+     LEARNING MODE
+============================================================ -->
+<section id="learning-section">
+  <div class="section-heading">
+    <div class="tag">GUIDED WALKTHROUGH</div>
+    <h2>Learning Mode</h2>
+    <p>Follow the fuel's exact path through the injector, step by step.</p>
+  </div>
+
+  <div id="learning-panel" class="glass">
+    <div class="lp-top">
+      <div class="lp-steps-nav" id="lp-dots"></div>
+      <button class="btn ghost" id="lp-play"><i class="fa-solid fa-play"></i> Play Sequence</button>
+    </div>
+    <div class="lp-body">
+      <div class="lp-visual">
+        <span class="step-num" id="lp-stepnum">1</span>
+        <i class="fa-solid fa-gas-pump" id="lp-icon"></i>
+      </div>
+      <div class="lp-text">
+        <div class="step-eyebrow" id="lp-eyebrow">STEP 1 / 6</div>
+        <h3 id="lp-title">Fuel Enters the Inlet</h3>
+        <p id="lp-desc">Loading…</p>
+      </div>
+    </div>
+    <div class="lp-controls">
+      <button class="btn ghost" id="lp-prev"><i class="fa-solid fa-arrow-left"></i> Previous</button>
+      <button class="btn primary" id="lp-next">Next <i class="fa-solid fa-arrow-right"></i></button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     FOOTER
+============================================================ -->
+<footer id="footer">
+  <div class="foot-title">DESIGNED FOR BOSCH FUEL INJECTOR ENGINEERING LEARNING</div>
+  <div class="foot-social">
+    <a href="#" title="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+    <a href="#" title="YouTube"><i class="fa-brands fa-youtube"></i></a>
+    <a href="#" title="X"><i class="fa-brands fa-x-twitter"></i></a>
+    <a href="#" title="GitHub"><i class="fa-brands fa-github"></i></a>
+  </div>
+  <div class="copy">© 2026 Bosch Injector Lab — Educational visualization, not an official Bosch product.</div>
+</footer>
+
+<div id="toast" class="glass"></div>
+
+<!-- ============================================================
+     THREE.JS via import map
+============================================================ -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ============================================================
+   V2.1 INFRASTRUCTURE: EventBus
+   Minimal pub/sub for decoupled system communication.
+   No existing V1.0 code depends on this — it is consumed
+   by StateStore (Task 2) and future Phase 2+ systems.
+============================================================ */
+class EventBus {
+  constructor() {
+    this._listeners = {};
+  }
+  on(event, callback) {
+    if (!this._listeners[event]) this._listeners[event] = [];
+    this._listeners[event].push(callback);
+    return () => this.off(event, callback);
+  }
+  off(event, callback) {
+    if (!this._listeners[event]) return;
+    this._listeners[event] = this._listeners[event].filter(cb => cb !== callback);
+  }
+  emit(event, data) {
+    if (!this._listeners[event]) return;
+    this._listeners[event].forEach(cb => cb(data));
+  }
+}
+const eventBus = new EventBus();
+
+/* ============================================================
+   V2.1 INFRASTRUCTURE: QualityManager
+   Centralized performance and rendering capability manager.
+   Ensures deterministic simulation while scaling visuals.
+============================================================ */
+class QualityManager {
+  constructor() {
+    this.tiers = {
+      low: { targetFPS: 60, maxParticles: 500, postProcessing: 'minimal', shadowQuality: 'low', pixelRatio: 1.0 },
+      medium: { targetFPS: 60, maxParticles: 2000, postProcessing: 'outline', shadowQuality: 'medium', pixelRatio: 1.5 },
+      high: { targetFPS: 60, maxParticles: 5000, postProcessing: 'full', shadowQuality: 'high', pixelRatio: 2.0 },
+      ultra: { targetFPS: 60, maxParticles: 10000, postProcessing: 'ultra', shadowQuality: 'ultra', pixelRatio: 2.0 },
+      experimental: { targetFPS: 60, maxParticles: 20000, postProcessing: 'ultra', shadowQuality: 'ultra', pixelRatio: 2.0 }
+    };
+    this.currentTier = 'medium'; // Default fallback
+    this.config = this.tiers[this.currentTier];
+  }
+
+  autoDetect(renderer) {
+    const maxTex = renderer.capabilities.maxTextureSize;
+    const isMobile = navigator.maxTouchPoints > 0;
+    
+    if (maxTex >= 16384 && !isMobile) {
+      this.setTier('ultra');
+    } else if (maxTex >= 8192 && !isMobile) {
+      this.setTier('high');
+    } else if (maxTex >= 4096) {
+      this.setTier('medium');
+    } else {
+      this.setTier('low');
+    }
+  }
+
+  setTier(tierName) {
+    if (this.tiers[tierName]) {
+      this.currentTier = tierName;
+      this.config = this.tiers[tierName];
+      console.log(`[QualityManager] Hardware profile: ${tierName.toUpperCase()}`);
+      eventBus.emit('quality:changed', { tier: tierName, config: this.config });
+    }
+  }
+}
+const qualityManager = new QualityManager();
+
+/* ============================================================
+   0. PARTS DATA — geometry configs + engineering info
+============================================================ */
+const BODY_CENTER_Y = 2.6;
+
+const PARTS = [
+  {
+    id:'connector', name:'Electrical Connector', geom:'box',
+    pos:[0, 9.5, 0], size:[0.9,1.0,0.9], color:0x0091D8, metalness:0.2, roughness:0.5,
+    info:{
+      purpose:'Provides the electrical interface between the engine control unit (ECU) and the injector solenoid.',
+      func:'Carries the switched drive current that energizes the solenoid coil on the ECU\'s command.',
+      working:'A multi-pin connector locks onto a wiring harness; contact pins pass current directly to the coil terminals inside the injector head.',
+      material:'Glass-filled thermoplastic housing with gold-plated brass or copper alloy pins.',
+      bosch:'Bosch connectors are sealed to IP6K9K standards, keeping moisture and contaminants away from the live contacts in harsh engine-bay conditions.',
+      failure:'Corroded pins, melted housings from excess resistance, or a broken locking tab causing intermittent connection.',
+      maintenance:'Inspect for corrosion, ensure the locking clip is fully seated, and check pin continuity with a multimeter if misfire codes appear.',
+      application:'Used on every solenoid-type port and common-rail injector requiring an external harness connection.'
+    }
+  },
+  {
+    id:'cap', name:'Injector Cap', geom:'cylinder',
+    pos:[0, 8.55, 0], size:[0.82,0.86,0.75,24], color:0xB8C4CE, metalness:0.85, roughness:0.25,
+    info:{
+      purpose:'Encloses and protects the solenoid assembly and upper internal components.',
+      func:'Acts as a structural and environmental shield, sealing the top of the injector body.',
+      working:'Threaded or pressed onto the injector body, compressing an internal seal to keep the solenoid chamber clean and dry.',
+      material:'Cold-formed or machined low-carbon steel with a corrosion-resistant coating.',
+      bosch:'Bosch caps are precision-stamped to tight tolerances so they do not interfere with solenoid magnetic flux paths.',
+      failure:'Cracking from thermal cycling, or loosening that lets in moisture and contaminants.',
+      maintenance:'Check torque during service and replace if the seal surface shows pitting or corrosion.',
+      application:'Standard on solenoid and piezo common-rail injectors as the topmost protective cover.'
+    }
+  },
+  {
+    id:'coil', name:'Solenoid Coil', geom:'cylinder',
+    pos:[0, 7.15, 0], size:[1.05,1.05,1.55,28], color:0xB5651D, metalness:0.55, roughness:0.35,
+    info:{
+      purpose:'Generates the magnetic field that lifts the armature and opens the control valve.',
+      func:'Converts electrical current from the ECU into a magnetic force.',
+      working:'When energized, the copper winding produces a magnetic field that pulls the steel armature upward against spring pressure, initiating injection.',
+      material:'Enamel-coated copper wire wound around a bobbin, encapsulated in epoxy resin.',
+      bosch:'Bosch solenoids are engineered for sub-millisecond response times, enabling multiple injection events per combustion cycle.',
+      failure:'Winding short circuits, resistance drift from overheating, or epoxy cracking allowing fuel ingress.',
+      maintenance:'Measure coil resistance against spec; replace the injector if resistance is out of range or response time is slow.',
+      application:'Core actuation component of all solenoid-driven Bosch fuel injectors.'
+    }
+  },
+  {
+    id:'armature', name:'Armature', geom:'cylinder',
+    pos:[0, 6.05, 0], size:[0.72,0.72,0.24,28], color:0x9AA7B2, metalness:0.9, roughness:0.2,
+    info:{
+      purpose:'Transfers the solenoid\'s magnetic force into mechanical motion.',
+      func:'Moves axially when magnetized, pulling the valve ball or needle assembly off its seat.',
+      working:'The ferromagnetic disc is attracted to the energized coil, lifting instantly and returning via spring force once current is cut.',
+      material:'Soft magnetic steel alloy, precision ground for flat, parallel faces.',
+      bosch:'Bosch armatures are mass-optimized to minimize inertia, allowing extremely fast switching for precise fuel metering.',
+      failure:'Surface wear from repeated impacts, or magnetic saturation reducing responsiveness over time.',
+      maintenance:'Not independently serviceable; injector replacement is required if armature wear affects timing.',
+      application:'Present in every solenoid-actuated injector as the moving magnetic element.'
+    }
+  },
+  {
+    id:'retainNut', name:'Retaining Nut', geom:'cylinder',
+    pos:[0, 5.65, 0], size:[0.98,1.02,0.42,24], color:0xC7D2DB, metalness:0.85, roughness:0.28,
+    info:{
+      purpose:'Mechanically clamps internal components together and secures the injector body assembly.',
+      func:'Applies compressive preload that keeps stacked components sealed under high pressure.',
+      working:'Threaded onto the injector body and torqued to a specified value, it holds the nozzle assembly firmly against the body.',
+      material:'High-strength alloy steel, often nickel or zinc plated for corrosion resistance.',
+      bosch:'Bosch specifies exact torque sequences for retaining nuts to maintain nozzle seating pressure and prevent internal leakage.',
+      failure:'Loosening from vibration, thread galling, or over-torquing that distorts the nozzle seat.',
+      maintenance:'Always torque to factory specification using a calibrated wrench; never reuse a deformed nut.',
+      application:'Used on nearly all diesel and GDI injector designs to retain the nozzle and internal stack.'
+    }
+  },
+  {
+    id:'oringUpper', name:'O-Ring Upper', geom:'torus',
+    pos:[0, 5.28, 0], size:[0.58,0.075,12,28], color:0x1A1A1A, metalness:0.1, roughness:0.8,
+    info:{
+      purpose:'Seals the upper fuel or return passage against leakage.',
+      func:'Prevents fuel from escaping along the injector body at the upper interface with the fuel rail or cylinder head.',
+      working:'The elastomeric ring is compressed between two machined surfaces, deforming slightly to fill microscopic surface irregularities.',
+      material:'Fluoroelastomer (FKM/Viton) rubber, chosen for fuel resistance and heat tolerance.',
+      bosch:'Bosch specifies fuel-grade elastomer compounds validated for decades of exposure to modern fuel additives.',
+      failure:'Hardening, cracking, or swelling over time leading to external fuel leaks or air ingress.',
+      maintenance:'Replace with every injector removal — O-rings should never be reused.',
+      application:'Standard sealing element wherever the injector interfaces with the fuel rail or head.'
+    }
+  },
+  {
+    id:'inlet', name:'Fuel Inlet', geom:'cylinderH',
+    pos:[1.55, 7.35, 0], size:[0.30,0.30,1.5,20], color:0xC7D2DB, metalness:0.85, roughness:0.25,
+    info:{
+      purpose:'The entry point through which pressurized fuel enters the injector from the fuel rail.',
+      func:'Channels high-pressure fuel from the common rail into the injector\'s internal fuel passage.',
+      working:'A banjo bolt or direct threaded fitting connects the rail supply line, delivering fuel under constant high pressure to the inlet port.',
+      material:'Machined steel, pressure-rated for common-rail operating pressures.',
+      bosch:'Bosch inlet fittings are engineered to handle pressures beyond 2,000 bar in modern common-rail systems without deformation.',
+      failure:'Fitting leaks from a damaged sealing washer, or thread damage from over-torquing.',
+      maintenance:'Always fit new sealing washers when reconnecting the fuel line; torque to spec.',
+      application:'Present on all high-pressure common-rail injectors as the fuel supply connection.'
+    }
+  },
+  {
+    id:'filter', name:'Fuel Filter', geom:'cylinderH',
+    pos:[2.75, 7.35, 0], size:[0.34,0.34,0.65,20], color:0xE8E4D8, metalness:0.1, roughness:0.7,
+    info:{
+      purpose:'Protects internal precision components from particulate contamination.',
+      func:'Filters fine debris out of incoming fuel before it reaches the control valve and nozzle.',
+      working:'A fine wire mesh or sintered element traps particles above a few microns while allowing fuel to pass freely.',
+      material:'Stainless steel wire mesh or sintered bronze filter element.',
+      bosch:'Bosch integrates inlet filtration directly into the injector as a last line of defense against wear-causing particles in precision-lapped components.',
+      failure:'Clogging over time causes reduced flow, rough idle, or injector starvation under load.',
+      maintenance:'Not usually user-serviceable; a clogged internal filter typically requires injector replacement.',
+      application:'Fitted just downstream of the fuel inlet on virtually all common-rail injectors.'
+    }
+  },
+  {
+    id:'body', name:'Injector Body', geom:'cylinder',
+    pos:[0, BODY_CENTER_Y, 0], size:[0.80,0.80,5.4,32], color:0x8E9BA6, metalness:0.9, roughness:0.22,
+    isBody:true,
+    info:{
+      purpose:'The main structural housing that contains and aligns every internal component.',
+      func:'Provides rigid mechanical support, internal fuel galleries, and precise bore alignment for the needle and control valve.',
+      working:'Precision-machined and lapped internal bores guide the needle valve with sub-micron clearances, ensuring consistent fuel metering.',
+      material:'Hardened, precision-ground alloy steel capable of withstanding cyclic high-pressure loading.',
+      bosch:'Bosch injector bodies are manufactured with micron-level tolerances in dedicated precision machining lines, a hallmark of common-rail reliability.',
+      failure:'Internal bore wear over very high mileage, or external cracking from improper installation torque.',
+      maintenance:'Non-serviceable internally; the body defines the injector\'s service life as a sealed precision assembly.',
+      application:'Core housing of every Bosch solenoid and piezo common-rail injector.'
+    }
+  },
+  {
+    id:'controlChamber', name:'Control Chamber', geom:'cylinder',
+    pos:[0, 5.05, 0], size:[0.40,0.40,0.55,20], color:0x5B6B78, metalness:0.8, roughness:0.3,
+    info:{
+      purpose:'A small hydraulic chamber above the needle that governs when the needle lifts or seats.',
+      func:'Fuel pressure in this chamber holds the needle closed; venting this pressure allows injection to begin.',
+      working:'When the solenoid opens the control valve, fuel drains from the chamber faster than it refills, dropping pressure and allowing the needle to lift.',
+      material:'Precision-machined steel, integrated into the injector body or a separate control plate.',
+      bosch:'Bosch\'s balanced control-chamber design is central to achieving precise, repeatable injection timing across millions of cycles.',
+      failure:'Wear at the control orifice altering injection timing, or contamination blocking the drain passage.',
+      maintenance:'Not field-serviceable; timing drift here usually indicates the injector needs replacement.',
+      application:'Fundamental to all solenoid and piezo common-rail injector designs.'
+    }
+  },
+  {
+    id:'fuelPassage', name:'Fuel Passage', geom:'cylinderThin',
+    pos:[0.35, 2.6, 0], size:[0.075,0.075,4.6,14], color:0x445563, metalness:0.7, roughness:0.4,
+    info:{
+      purpose:'An internal channel that routes high-pressure fuel from the inlet down to the pressure chamber and nozzle.',
+      func:'Provides a continuous, unrestricted path for fuel to flow within the injector body.',
+      working:'Drilled or cast into the body, this passage maintains fuel at rail pressure right up to the nozzle sac.',
+      material:'Integral to the machined steel injector body.',
+      bosch:'Bosch drills these passages with extremely tight diametral tolerances to minimize pressure loss and flow turbulence.',
+      failure:'Blockage from contamination or fuel varnish buildup, restricting flow and reducing power.',
+      maintenance:'Addressed via fuel system cleaning and quality fuel filtration upstream of the injector.',
+      application:'Present in every common-rail and port-injection design as the internal fuel route.'
+    }
+  },
+  {
+    id:'pressureChamber', name:'Pressure Chamber', geom:'cylinder',
+    pos:[0, 0.9, 0], size:[0.38,0.38,0.7,20], color:0x5B6B78, metalness:0.8, roughness:0.3,
+    info:{
+      purpose:'Holds pressurized fuel immediately above the nozzle, ready for injection.',
+      func:'Maintains fuel at full rail pressure so that, the instant the needle lifts, fuel sprays instantly with no lag.',
+      working:'Continuously fed via the fuel passage, this chamber surrounds the needle tip just above the nozzle seat.',
+      material:'Precision-machined steel, integral to the nozzle body assembly.',
+      bosch:'Bosch designs this chamber\'s volume to be as small as possible, reducing compressibility effects and improving injection response.',
+      failure:'Erosion from cavitation over very high mileage, subtly altering spray characteristics.',
+      maintenance:'Not independently serviceable; part of the sealed nozzle assembly.',
+      application:'Found directly above the nozzle in all direct-injection injector types.'
+    }
+  },
+  {
+    id:'needleSpring', name:'Needle Spring', geom:'spring',
+    pos:[0, 4.05, 0], size:[0.24,0.032,1.3,7], color:0xC7D2DB, metalness:0.9, roughness:0.2,
+    info:{
+      purpose:'Provides the closing force that seats the needle valve when injection ends.',
+      func:'Preloads the needle downward against the nozzle seat, ensuring a fast, leak-free shutoff.',
+      working:'Compressed between a shoulder in the body and the top of the needle, the spring pushes the needle closed the instant control chamber pressure rises again.',
+      material:'Hardened, shot-peened spring steel wire for fatigue resistance across millions of cycles.',
+      bosch:'Bosch calibrates spring preload precisely to balance fast closing with minimal needle-seat impact wear.',
+      failure:'Spring fatigue or weakening over extreme mileage, leading to slow needle closing and dribble.',
+      maintenance:'Not independently replaceable; addressed via injector overhaul or replacement.',
+      application:'Standard closing-force component in nearly all solenoid and piezo injectors.'
+    }
+  },
+  {
+    id:'needleValve', name:'Needle Valve', geom:'cylinderThin',
+    pos:[0, 1.2, 0], size:[0.10,0.10,4.6,16], color:0xD9E1E9, metalness:0.95, roughness:0.15,
+    info:{
+      purpose:'The precision-ground moving element that opens and closes the nozzle spray holes.',
+      func:'Lifts off its seat to allow fuel to spray, and reseats to instantly stop flow.',
+      working:'Driven indirectly by control-chamber pressure changes, the needle lifts a few tenths of a millimeter to unblock the nozzle orifices.',
+      material:'Hardened, precision-lapped tool steel with a mirror-finish sealing cone.',
+      bosch:'Bosch needles are lapped to their individual nozzle body as a matched pair, which is why nozzle assemblies are serviced as a single unit.',
+      failure:'Seat wear causing dribble, or sticking from carbon deposits leading to misfire or knocking.',
+      maintenance:'Ultrasonic cleaning can sometimes free minor sticking; heavy wear requires nozzle assembly replacement.',
+      application:'The central metering element in every diesel and GDI fuel injector.'
+    }
+  },
+  {
+    id:'valveBall', name:'Valve Ball', geom:'sphere',
+    pos:[0, 4.85, 0], size:[0.19,20,20], color:0xE8ECEF, metalness:0.95, roughness:0.1,
+    info:{
+      purpose:'Acts as the on/off valve element within the solenoid-driven control valve.',
+      func:'Seals or unseals the control-chamber drain orifice, governing hydraulic pressure that moves the needle.',
+      working:'Lifted off its seat by the armature, the ball unblocks the drain orifice, rapidly bleeding control-chamber pressure to begin injection.',
+      material:'Hardened chrome-steel or ceramic ball, ground to sub-micron sphericity.',
+      bosch:'Bosch\'s ball-seat valve geometry is optimized for minimal wear despite thousands of high-speed cycles per minute of engine operation.',
+      failure:'Seat erosion causing internal leakage, injection timing drift, or hard starting.',
+      maintenance:'Not serviceable individually; part of the sealed control valve assembly.',
+      application:'Common in solenoid-type common-rail injector control valves.'
+    }
+  },
+  {
+    id:'returnSpring', name:'Return Spring', geom:'spring',
+    pos:[0, 6.35, 0], size:[0.16,0.022,0.55,6], color:0xC7D2DB, metalness:0.9, roughness:0.2,
+    info:{
+      purpose:'Returns the armature and control valve to their closed rest position after each injection event.',
+      func:'Provides a light restoring force once solenoid current is switched off.',
+      working:'As the coil de-energizes, this spring pushes the armature back down, reseating the ball valve and allowing control-chamber pressure to rebuild.',
+      material:'Fine-gauge hardened spring steel wire.',
+      bosch:'Bosch tunes this spring\'s rate to allow the fastest possible valve closing without excessive seat impact.',
+      failure:'Fatigue-related weakening leading to delayed valve closing and reduced injection precision.',
+      maintenance:'Non-serviceable independently; addressed through full injector replacement if degraded.',
+      application:'Present in the solenoid control-valve stack of common-rail injectors.'
+    }
+  },
+  {
+    id:'spacer', name:'Spacer', geom:'cylinder',
+    pos:[0, 3.35, 0], size:[0.44,0.44,0.16,20], color:0x9AA7B2, metalness:0.85, roughness:0.3,
+    info:{
+      purpose:'Maintains precise axial spacing between internal components within the body stack.',
+      func:'Sets the exact gap needed for correct spring preload and needle lift travel.',
+      working:'A thin, precisely ground washer-like disc is stacked between components during assembly to fine-tune internal clearances.',
+      material:'Hardened steel, ground flat and parallel to tight thickness tolerances.',
+      bosch:'Bosch selects spacer thickness individually during assembly to calibrate each injector\'s exact flow characteristics.',
+      failure:'Incorrect spacer thickness (rare, assembly-related) can cause improper needle lift or preload.',
+      maintenance:'Not a wear item; relevant only during factory assembly or full rebuild.',
+      application:'Used within the internal stack of most modern common-rail injector designs.'
+    }
+  },
+  {
+    id:'sealRing', name:'Seal Ring', geom:'torus',
+    pos:[0, -1.55, 0], size:[0.42,0.065,12,26], color:0x1A1A1A, metalness:0.1, roughness:0.8,
+    info:{
+      purpose:'Seals the nozzle assembly against the combustion chamber side of the cylinder head.',
+      func:'Prevents high-pressure combustion gases from leaking past the injector tip into the injector bore.',
+      working:'A copper or steel sealing washer is compressed between the nozzle shoulder and the cylinder head bore upon installation.',
+      material:'Copper or heat-resistant steel washer, sometimes with a coated surface for improved sealing.',
+      bosch:'Bosch specifies a fresh seal ring on every injector installation to guarantee a gas-tight combustion seal.',
+      failure:'Combustion gas blow-by, carbon tracking up the injector body, or a burnt smell from the engine bay.',
+      maintenance:'Always replace with a new, correctly rated seal ring whenever an injector is removed.',
+      application:'Fitted at the nozzle-to-cylinder-head interface on all direct-injection engines.'
+    }
+  },
+  {
+    id:'oringLower', name:'O-Ring Lower', geom:'torus',
+    pos:[0, -1.85, 0], size:[0.40,0.055,12,26], color:0x1A1A1A, metalness:0.1, roughness:0.8,
+    info:{
+      purpose:'Provides a secondary seal lower on the injector body, isolating fuel and combustion-side passages.',
+      func:'Prevents cross-contamination between fuel return paths and the combustion chamber environment.',
+      working:'Compressed radially within its groove as the injector is inserted into the cylinder-head bore.',
+      material:'High-temperature fluoroelastomer or PTFE-based sealing compound.',
+      bosch:'Bosch selects lower O-ring compounds specifically rated for combustion-adjacent heat exposure.',
+      failure:'Heat-hardening leading to loss of elasticity and minor seepage over long service intervals.',
+      maintenance:'Replace whenever the injector is removed from the cylinder head.',
+      application:'Standard on direct-injection injectors seated within the cylinder head bore.'
+    }
+  },
+  {
+    id:'nozzleBody', name:'Nozzle Body', geom:'cylinderTaper',
+    pos:[0, -2.65, 0], size:[0.78,0.30,1.5,24], color:0x8E9BA6, metalness:0.9, roughness:0.22,
+    info:{
+      purpose:'Houses the needle valve and forms the final metering geometry before the spray holes.',
+      func:'Guides the needle precisely and shapes the fuel flow path toward the spray orifices.',
+      working:'Lapped as a matched pair with its needle, the nozzle body maintains micron-level radial clearance for leak-free, low-friction needle movement.',
+      material:'Hardened, precision-ground tool steel.',
+      bosch:'Bosch nozzle bodies are individually matched and serial-numbered together with their needle during manufacturing.',
+      failure:'Bore wear increasing needle side-play, leading to poor spray pattern or internal leakage.',
+      maintenance:'Serviced only as a matched nozzle assembly, never with individually swapped parts.',
+      application:'Present in every diesel and GDI injector as the needle\'s precision guide.'
+    }
+  },
+  {
+    id:'nozzleTip', name:'Nozzle Tip', geom:'cone',
+    pos:[0, -3.7, 0], size:[0.30,0.035,0.62,20], color:0xD9E1E9, metalness:0.95, roughness:0.15,
+    info:{
+      purpose:'The final orifice geometry that atomizes fuel into the combustion chamber.',
+      func:'Breaks pressurized fuel into a fine mist via multiple precisely angled micro-holes.',
+      working:'As the needle lifts, fuel is forced through several laser-drilled holes (often 5-10 microns in critical dimension), creating a highly atomized, well-distributed spray pattern.',
+      material:'Hardened tool steel with laser-drilled and hydro-eroded spray holes.',
+      bosch:'Bosch\'s hydro-erosive finishing process rounds each hole\'s edges to a precise radius, improving flow consistency across the injector\'s life.',
+      failure:'Hole erosion or carbon coking altering spray pattern, causing poor combustion, smoke, or knocking.',
+      maintenance:'Ultrasonic cleaning can restore mild coking; heavily eroded tips require nozzle replacement.',
+      application:'The business end of every direct-injection fuel injector, diesel or gasoline.'
+    }
+  }
+];
+
+/* Search alias keywords -> part id, to satisfy fuzzy queries like "needle" matching two parts */
+function partMatchesQuery(part, q){
+  if(!q) return true;
+  q = q.toLowerCase();
+  return part.name.toLowerCase().includes(q) || part.id.toLowerCase().includes(q);
+}
+
+/* ============================================================
+   1. LEARNING MODE STEPS
+============================================================ */
+const LEARNING_STEPS = [
+  { title:'Fuel Enters the Inlet', icon:'fa-gas-pump', partIds:['inlet'],
+    desc:'High-pressure fuel from the common rail arrives at the Fuel Inlet, ready to be routed into the injector body.' },
+  { title:'Fuel Passes Through the Filter', icon:'fa-filter', partIds:['filter'],
+    desc:'The Fuel Filter strips out fine particulate before fuel is allowed deeper into the precision internals.' },
+  { title:'Fuel Reaches the Control Chamber', icon:'fa-layer-group', partIds:['controlChamber','fuelPassage'],
+    desc:'Fuel travels down the internal Fuel Passage and pressurizes the Control Chamber, holding the needle shut.' },
+  { title:'The Solenoid Activates', icon:'fa-bolt', partIds:['coil','armature','valveBall'],
+    desc:'The ECU energizes the Solenoid Coil, pulling the Armature upward and lifting the Valve Ball off its seat.' },
+  { title:'The Needle Lifts', icon:'fa-arrow-up-long', partIds:['needleValve','needleSpring'],
+    desc:'Control-chamber pressure drops instantly, and rail pressure overcomes the Needle Spring — the Needle Valve lifts.' },
+  { title:'Fuel Sprays From the Nozzle', icon:'fa-shower', partIds:['nozzleTip','nozzleBody'],
+    desc:'Fuel rushes through the Nozzle Body and atomizes into a fine mist through the Nozzle Tip\'s micro-holes.' },
+];
+
+/* ============================================================
+   2. THREE.JS SCENE SETUP
+============================================================ */
+const canvas = document.getElementById('three-canvas');
+const viewerWrap = document.getElementById('viewer-wrap');
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+const DEFAULT_CAM_POS = new THREE.Vector3(7.5, 3.2, 10.5);
+const DEFAULT_TARGET = new THREE.Vector3(0, 2.6, 0);
+camera.position.copy(DEFAULT_CAM_POS);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:true, preserveDrawingBuffer:true });
+qualityManager.autoDetect(renderer);
+
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, qualityManager.config.pixelRatio));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = qualityManager.config.shadowQuality === 'low' ? THREE.BasicShadowMap : 
+                          qualityManager.config.shadowQuality === 'medium' ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+
+// Environment map for realistic chrome reflections
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+
+/* ---- Post-Processing Setup (V2.1) ---- */
+const enablePostProcessing = qualityManager.config.postProcessing !== 'minimal';
+
+let composer, outlinePass;
+if (enablePostProcessing) {
+  composer = new EffectComposer(renderer);
+  
+  const renderPass = new RenderPass(scene, camera);
+  composer.addPass(renderPass);
+  
+  outlinePass = new OutlinePass(new THREE.Vector2(window.innerWidth, window.innerHeight), scene, camera);
+  outlinePass.edgeStrength = 4.0;
+  outlinePass.edgeGlow = 1.0;
+  outlinePass.edgeThickness = 1.5;
+  outlinePass.visibleEdgeColor.set('#E2001A');
+  outlinePass.hiddenEdgeColor.set('#E2001A');
+  composer.addPass(outlinePass);
+  
+  // Future Passes: Pressure Heatmap, Diagnostic Overlay, X-Ray Pass, Selective Bloom
+  
+  const outputPass = new OutputPass();
+  composer.addPass(outputPass);
+}
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(DEFAULT_TARGET);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 3.5;
+controls.maxDistance = 26;
+controls.maxPolarAngle = Math.PI * 0.92;
+controls.update();
+
+/* ---- Lighting ---- */
+scene.add(new THREE.HemisphereLight(0xbfd9ff, 0x0a0a10, 0.55));
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.1);
+keyLight.position.set(8, 12, 6);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 40;
+keyLight.shadow.camera.left = -10; keyLight.shadow.camera.right = 10;
+keyLight.shadow.camera.top = 10; keyLight.shadow.camera.bottom = -10;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x3fc1ff, 0.85);
+fillLight.position.set(-9, 4, -6);
+scene.add(fillLight);
+
+const rimLight = new THREE.PointLight(0xE2001A, 8, 30, 2);
+rimLight.position.set(-4, -2, 6);
+scene.add(rimLight);
+
+const groundGlow = new THREE.PointLight(0x0091D8, 6, 20, 2);
+groundGlow.position.set(0, -6, 4);
+scene.add(groundGlow);
+
+/* Ground reflection disc */
+const groundGeo = new THREE.CircleGeometry(9, 64);
+const groundMat = new THREE.MeshStandardMaterial({ color:0x0b141c, metalness:0.3, roughness:0.7, transparent:true, opacity:0.55 });
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.rotation.x = -Math.PI/2;
+ground.position.y = -5.3;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ============================================================
+   3. BUILD INJECTOR PARTS
+============================================================ */
+const injectorGroup = new THREE.Group();
+scene.add(injectorGroup);
+
+const partsRegistry = {};      // id -> { mesh, data, originalPos, explodeVec, material }
+const clickableMeshes = [];
+
+function makeMaterial(cfg){
+  return new THREE.MeshPhysicalMaterial({
+    color: cfg.color,
+    metalness: cfg.metalness,
+    roughness: cfg.roughness,
+    clearcoat: cfg.metalness > 0.7 ? 0.35 : 0,
+    clearcoatRoughness: 0.25,
+    envMapIntensity: 1.15,
+  });
+}
+
+function buildSpring(coilRadius, tubeRadius, height, turns){
+  const pts = [];
+  const segsPerTurn = 24;
+  const totalSegs = Math.round(turns * segsPerTurn);
+  for(let i=0;i<=totalSegs;i++){
+    const t = i/totalSegs;
+    const ang = t * turns * Math.PI * 2;
+    const y = (t - 0.5) * height;
+    pts.push(new THREE.Vector3(Math.cos(ang)*coilRadius, y, Math.sin(ang)*coilRadius));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  return new THREE.TubeGeometry(curve, totalSegs, tubeRadius, 8, false);
+}
+
+PARTS.forEach((part, idx) => {
+  let geometry;
+  const s = part.size;
+  switch(part.geom){
+    case 'box':
+      geometry = new THREE.BoxGeometry(s[0], s[1], s[2]); break;
+    case 'cylinder':
+      geometry = new THREE.CylinderGeometry(s[0], s[1], s[2], s[3]); break;
+    case 'cylinderH': // lateral (rotated) cylinder e.g. inlet / filter
+      geometry = new THREE.CylinderGeometry(s[0], s[1], s[2], s[3]); break;
+    case 'cylinderThin':
+      geometry = new THREE.CylinderGeometry(s[0], s[1], s[2], s[3]); break;
+    case 'cylinderTaper':
+      geometry = new THREE.CylinderGeometry(s[0], s[1], s[2], s[3]); break;
+    case 'cone':
+      geometry = new THREE.CylinderGeometry(s[0], s[1], s[2], s[3]); break;
+    case 'torus':
+      geometry = new THREE.TorusGeometry(s[0], s[1], 12, s[2] || 28); break;
+    case 'sphere':
+      geometry = new THREE.SphereGeometry(s[0], s[1], s[2]); break;
+    case 'spring':
+      geometry = buildSpring(s[0], s[1], s[2], s[3]); break;
+    default:
+      geometry = new THREE.BoxGeometry(0.5,0.5,0.5);
+  }
+
+  const material = makeMaterial(part);
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.position.set(part.pos[0], part.pos[1], part.pos[2]);
+  if(part.geom === 'cylinderH'){
+    mesh.rotation.z = Math.PI/2;
+  }
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.userData.partId = part.id;
+  mesh.renderOrder = part.isBody ? 0 : 1;
+
+  injectorGroup.add(mesh);
+  clickableMeshes.push(mesh);
+
+  const originalPos = mesh.position.clone();
+  let explodeVec = originalPos.clone().sub(new THREE.Vector3(0, BODY_CENTER_Y, 0));
+  if(explodeVec.length() < 0.05) explodeVec.set(0,1,0);
+  explodeVec.normalize().multiplyScalar(2.6 + (idx % 5) * 0.35);
+
+  partsRegistry[part.id] = {
+    mesh, data:part, material,
+    originalPos, explodeVec,
+    baseColor: material.color.clone(),
+    baseOpacity: 1,
+  };
+});
+
+// Gentle default rotation so the injector reads nicely on load
+injectorGroup.rotation.y = 0.35;
+
+/* ============================================================
+   4. FUEL FLOW PARTICLES (V2.1: InstancedMesh engine)
+   - 72 individual Mesh draw calls → 2 InstancedMesh draw calls
+   - Generic ParticleInstance data structure for future
+     multi-type support (diesel, water, dust, rust, etc.)
+   - flowGroup/sprayGroup preserved as containers so existing
+     flowGroup.visible toggles continue to work unchanged
+============================================================ */
+const flowPathPoints = [
+  new THREE.Vector3(1.55, 7.35, 0),   // inlet
+  new THREE.Vector3(2.75, 7.35, 0),   // filter
+  new THREE.Vector3(0.35, 5.2, 0),    // toward control chamber
+  new THREE.Vector3(0.35, 2.6, 0),    // fuel passage
+  new THREE.Vector3(0, 0.9, 0),       // pressure chamber
+  new THREE.Vector3(0, -2.6, 0),      // nozzle body
+  new THREE.Vector3(0, -4.2, 0),      // nozzle tip / spray
+];
+const flowCurve = new THREE.CatmullRomCurve3(flowPathPoints);
+
+// --- Generic particle instance data (V2.1 future-ready) ---
+// Each entry: { t, life, angle, speed, type }
+// 'type' field reserved for Phase 3 contamination types
+const FLOW_COUNT = 46;
+const SPRAY_COUNT = 26;
+
+const flowInstances = [];
+for (let i = 0; i < FLOW_COUNT; i++) {
+  flowInstances.push({ t: i / FLOW_COUNT, type: 'diesel' });
+}
+
+const sprayInstances = [];
+for (let i = 0; i < SPRAY_COUNT; i++) {
+  sprayInstances.push({
+    life: Math.random(),
+    angle: Math.random() * Math.PI * 2,
+    speed: 0.4 + Math.random() * 0.6,
+    type: 'diesel'
+  });
+}
+
+// --- InstancedMesh: Flow particles ---
+const flowGeo = new THREE.SphereGeometry(0.055, 8, 8);
+const flowMat = new THREE.MeshBasicMaterial({ color: 0x3fc1ff, transparent: true, opacity: 0.9 });
+const flowInstancedMesh = new THREE.InstancedMesh(flowGeo, flowMat, FLOW_COUNT);
+flowInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+// Per-instance opacity via custom InstancedBufferAttribute
+const flowOpacityAttr = new THREE.InstancedBufferAttribute(new Float32Array(FLOW_COUNT), 1);
+flowOpacityAttr.setUsage(THREE.DynamicDrawUsage);
+flowInstancedMesh.geometry.setAttribute('instanceOpacity', flowOpacityAttr);
+
+// Inject per-instance opacity into the material shader
+flowMat.onBeforeCompile = (shader) => {
+  shader.vertexShader = shader.vertexShader.replace(
+    'void main() {',
+    'attribute float instanceOpacity;\nvarying float vInstanceOpacity;\nvoid main() {\nvInstanceOpacity = instanceOpacity;'
+  );
+  shader.fragmentShader = shader.fragmentShader.replace(
+    'void main() {',
+    'varying float vInstanceOpacity;\nvoid main() {'
+  );
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <output_fragment>',
+    '#include <output_fragment>\ngl_FragColor.a *= vInstanceOpacity;'
+  );
+};
+
+// Initialize instance matrices (will be updated per-frame)
+const _tempMatrix = new THREE.Matrix4();
+const _tempPos = new THREE.Vector3();
+for (let i = 0; i < FLOW_COUNT; i++) {
+  const pt = flowCurve.getPointAt(flowInstances[i].t);
+  _tempMatrix.makeTranslation(pt.x, pt.y, pt.z);
+  flowInstancedMesh.setMatrixAt(i, _tempMatrix);
+  flowOpacityAttr.setX(i, 0.9);
+}
+flowInstancedMesh.instanceMatrix.needsUpdate = true;
+
+const flowGroup = new THREE.Group();
+flowGroup.add(flowInstancedMesh);
+flowGroup.visible = false;
+scene.add(flowGroup);
+
+// --- InstancedMesh: Spray particles ---
+const sprayGeo = new THREE.SphereGeometry(0.03, 6, 6);
+const sprayMat = new THREE.MeshBasicMaterial({ color: 0x9fe0ff, transparent: true, opacity: 1.0 });
+const sprayInstancedMesh = new THREE.InstancedMesh(sprayGeo, sprayMat, SPRAY_COUNT);
+sprayInstancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+const sprayOpacityAttr = new THREE.InstancedBufferAttribute(new Float32Array(SPRAY_COUNT), 1);
+sprayOpacityAttr.setUsage(THREE.DynamicDrawUsage);
+sprayInstancedMesh.geometry.setAttribute('instanceOpacity', sprayOpacityAttr);
+
+sprayMat.onBeforeCompile = (shader) => {
+  shader.vertexShader = shader.vertexShader.replace(
+    'void main() {',
+    'attribute float instanceOpacity;\nvarying float vInstanceOpacity;\nvoid main() {\nvInstanceOpacity = instanceOpacity;'
+  );
+  shader.fragmentShader = shader.fragmentShader.replace(
+    'void main() {',
+    'varying float vInstanceOpacity;\nvoid main() {'
+  );
+  shader.fragmentShader = shader.fragmentShader.replace(
+    '#include <output_fragment>',
+    '#include <output_fragment>\ngl_FragColor.a *= vInstanceOpacity;'
+  );
+};
+
+// Initialize spray instances at origin
+for (let i = 0; i < SPRAY_COUNT; i++) {
+  _tempMatrix.makeTranslation(0, 0, 0);
+  sprayInstancedMesh.setMatrixAt(i, _tempMatrix);
+  sprayOpacityAttr.setX(i, 0);
+}
+sprayInstancedMesh.instanceMatrix.needsUpdate = true;
+
+const sprayGroup = new THREE.Group();
+sprayGroup.add(sprayInstancedMesh);
+sprayGroup.position.set(0, -4.2, 0);
+scene.add(sprayGroup);
+
+/* ============================================================
+   4b. CONTAMINATION SIMULATION ENGINE (Phase 2)
+   Interactive engineering visualization of contaminant behavior
+   inside a Bosch Common Rail Injector.
+   Educational tool — representative behavior, not exact physics.
+============================================================ */
+
+// --- Particle Library ---
+const PARTICLE_LIBRARY = {
+  diesel:  { name:'Clean Diesel',   color:0x3FC1FF, size:0.055, speed:1.0,  opacity:0.9, blockageProb:0,    adhesion:0.0, mass:1.0, wearFactor:0.0, icon:'fa-droplet' },
+  dust:    { name:'Dust Particles', color:0x8B6914, size:0.04,  speed:0.85, opacity:0.7, blockageProb:0.15, adhesion:0.2, mass:1.5, wearFactor:0.1, icon:'fa-smog' },
+  rust:    { name:'Rust Flakes',    color:0xB7410E, size:0.065, speed:0.7,  opacity:0.85,blockageProb:0.25, adhesion:0.4, mass:5.2, wearFactor:0.4, icon:'fa-shield-halved' },
+  carbon:  { name:'Carbon Deposits',color:0x1A1A1A, size:0.08,  speed:0.5,  opacity:0.95,blockageProb:0.35, adhesion:0.9, mass:2.2, wearFactor:0.1, icon:'fa-fire' },
+  metal:   { name:'Metal Shavings', color:0xD4D4D4, size:0.09,  speed:0.6,  opacity:1.0, blockageProb:0.40, adhesion:0.3, mass:7.8, wearFactor:0.9, icon:'fa-gear' },
+  water:   { name:'Water Droplets', color:0x4DA6FF, size:0.07,  speed:0.9,  opacity:0.5, blockageProb:0.10, adhesion:0.1, mass:1.0, wearFactor:0.2, icon:'fa-water' },
+  air:     { name:'Air Bubbles',    color:0xFFFFFF, size:0.1,   speed:1.2,  opacity:0.3, blockageProb:0.05, adhesion:0.0, mass:0.1, wearFactor:0.0, icon:'fa-wind' },
+};
+
+// --- Component Vulnerability Map ---
+const COMPONENT_VULNERABILITY = {
+  filter:         { tStart:0.10, tEnd:0.20, partId:'filter',         vulnerableTo:['dust','rust','metal'],  capacity:100, baseWear:0.5 },
+  controlChamber: { tStart:0.25, tEnd:0.40, partId:'controlChamber', vulnerableTo:['dust','carbon','water', 'air'], capacity:80, baseWear:0.2 },
+  pressureChamber:{ tStart:0.45, tEnd:0.55, partId:'pressureChamber',vulnerableTo:['water','air'],          capacity:50,  baseWear:0.1 },
+  needleValve:    { tStart:0.55, tEnd:0.70, partId:'needleValve',    vulnerableTo:['carbon','rust','water'],capacity:60,  baseWear:0.2 },
+  nozzleTip:      { tStart:0.80, tEnd:0.95, partId:'nozzleTip',      vulnerableTo:['carbon','metal'],       capacity:40,  baseWear:0.4 },
+};
+
+// --- Simulation Presets ---
+const SIMULATION_PRESETS = {
+  healthy: { name:'Healthy Injector', type:'diesel', level:0,  color:'#22C55E', icon:'fa-circle-check', desc:'Normal operation — clean fuel, no contamination.' },
+  dust:    { name:'Dust Contamination', type:'dust',   level:40, color:'#EAB308', icon:'fa-smog',         desc:'Fine airborne particles entering through degraded fuel filters.' },
+  rust:    { name:'Rust Contamination', type:'rust',   level:50, color:'#EA580C', icon:'fa-shield-halved',desc:'Corrosion particles from fuel tank or supply lines.' },
+  carbon:  { name:'Carbon Build-Up',   type:'carbon', level:60, color:'#1A1A1A', icon:'fa-fire',         desc:'Combustion by-products accumulating on internal surfaces.' },
+  metal:   { name:'Metal Debris',      type:'metal',  level:70, color:'#DC2626', icon:'fa-gear',         desc:'Wear fragments from high-pressure pump or rail components.' },
+  water:   { name:'Water Intrusion',   type:'water',  level:45, color:'#3B82F6', icon:'fa-water',        desc:'Moisture entering the fuel system through condensation or contaminated fuel.' },
+};
+
+// --- Journey Stops (for Trace Particle mode) ---
+const JOURNEY_STOPS = [
+  { t:0.05, partId:'inlet',          title:'Fuel Inlet',
+    info:'Pressurized fuel enters here from the common rail. Contaminants present in the fuel supply begin their journey into the injector.' },
+  { t:0.15, partId:'filter',         title:'Edge Filter',
+    info:'The internal micro-filter is the first line of defense. Larger particles like rust flakes and metal shavings are trapped here. Over time, accumulated debris restricts fuel flow.' },
+  { t:0.32, partId:'controlChamber', title:'Control Chamber',
+    info:'This precision hydraulic chamber governs needle timing. Even microscopic contaminants can alter the pressure balance, causing erratic injection timing.' },
+  { t:0.50, partId:'pressureChamber',title:'Pressure Chamber',
+    info:'High-pressure fuel pools here before injection. Water droplets and air bubbles can cause cavitation or severe pressure oscillations.' },
+  { t:0.62, partId:'needleValve',    title:'Needle Seat',
+    info:'The needle valve seats with sub-micron precision. Carbon deposits or rust particles here prevent proper sealing, causing fuel dribble and incomplete combustion.' },
+  { t:0.90, partId:'nozzleTip',      title:'Nozzle Tip',
+    info:'Fuel atomizes through laser-drilled micro-holes (5–10 µm). Even partial blockage dramatically degrades spray quality, increasing emissions and reducing power.' },
+];
+
+// --- Educational Response Data ---
+const CONTAMINATION_EFFECTS = {
+  'filter+dust':           { symptom:'Gradual flow restriction, power loss under load', physics:'Dust limits surface area, increasing pressure drop.', maintenance:'Replace external fuel filter, check air intake seals' },
+  'filter+rust':           { symptom:'Intermittent fuel starvation, rough idle', physics:'Rust flakes physically block micro-channels.', maintenance:'Flush fuel system, inspect tank for corrosion' },
+  'filter+metal':          { symptom:'Risk of catastrophic downstream damage', physics:'Metal rapidly degrades filter mesh, passing debris downstream.', maintenance:'Full fuel system flush, inspect pump and rail' },
+  'controlChamber+dust':   { symptom:'Erratic injection timing, rough running', physics:'Fine particles alter hydraulic timing and response.', maintenance:'Ultrasonic injector cleaning, fuel system flush' },
+  'controlChamber+carbon': { symptom:'Delayed needle response, timing drift', physics:'Sticky deposits slow the control piston movement.', maintenance:'Professional injector cleaning service' },
+  'controlChamber+water':  { symptom:'Corrosion risk, erratic pressure control', physics:'Water lowers lubricity, causing galling and unpredictable pressure.', maintenance:'Drain water separator, replace contaminated fuel' },
+  'controlChamber+air':    { symptom:'Injection misfire, heavy vibration', physics:'Compressible air absorbs hydraulic force, preventing needle lift.', maintenance:'Bleed fuel system, check low-pressure lines for air leaks' },
+  'pressureChamber+water': { symptom:'Pressure oscillation, cavitation', physics:'Water droplets cause localized vapor expansion under heat/pressure.', maintenance:'Drain water separator, replace contaminated fuel' },
+  'pressureChamber+air':   { symptom:'Flow interruption, pressure spikes', physics:'Air bubble collapse creates micro-shockwaves (cavitation).', maintenance:'Bleed fuel system' },
+  'needleValve+carbon':    { symptom:'Injector dribble, incomplete combustion, smoke', physics:'Carbon prevents complete valve closure, causing stiction.', maintenance:'Ultrasonic cleaning or nozzle assembly replacement' },
+  'needleValve+rust':      { symptom:'Needle stiction, misfire codes', physics:'Rough oxidation drastically increases sliding friction.', maintenance:'Injector replacement — precision surfaces are compromised' },
+  'needleValve+water':     { symptom:'Needle oscillation, erratic fuel delivery', physics:'Water flashing to steam destabilizes the needle.', maintenance:'Fuel system drying/flush' },
+  'nozzleTip+carbon':      { symptom:'Poor spray pattern, increased emissions, knock', physics:'Deposits narrow the spray hole diameter (coking).', maintenance:'Hydro-erosive cleaning or nozzle replacement' },
+  'nozzleTip+metal':       { symptom:'Hole erosion, asymmetric spray, power loss', physics:'Hard metal shavings score and permanently enlarge spray holes.', maintenance:'Immediate nozzle replacement — irreversible damage' },
+};
+
+// --- BlockageTracker ---
+class BlockageTracker {
+  constructor() {
+    this.components = {};
+    Object.entries(COMPONENT_VULNERABILITY).forEach(([key, cfg]) => {
+      this.components[key] = { blockage:0, health:100, wear:0, capacity:cfg.capacity, contaminants:[], stuckCount:0 };
+    });
+    this.cycles = 0; // Simulated cycles
+  }
+
+  addBlockage(componentKey, contaminantType, amount) {
+    const comp = this.components[componentKey];
+    const particle = PARTICLE_LIBRARY[contaminantType];
+    if (!comp || !particle) return;
+    comp.blockage = Math.min(100, comp.blockage + amount);
+    
+    // Add wear based on particle's wearFactor
+    comp.wear += (particle.wearFactor * amount * 0.2);
+
+    if (!comp.contaminants.includes(contaminantType)) comp.contaminants.push(contaminantType);
+    comp.stuckCount++;
+    this._updateComponentHealth(componentKey);
+    eventBus.emit('blockage:updated', { component:componentKey, blockage:comp.blockage, contaminant:contaminantType });
+  }
+
+  updateCycles(dt, rpm = 800) {
+    const cyclesPerSecond = (rpm / 60) / 2; // 4-stroke engine
+    this.cycles += cyclesPerSecond * dt;
+    Object.keys(this.components).forEach(k => {
+       const cfg = COMPONENT_VULNERABILITY[k];
+       // Base wear over time
+       this.components[k].wear += (cfg.baseWear * cyclesPerSecond * dt * 0.005);
+       this._updateComponentHealth(k);
+    });
+  }
+
+  _updateComponentHealth(key) {
+    const comp = this.components[key];
+    // Health is 100 minus (blockage penalty + wear penalty)
+    comp.health = Math.max(0, 100 - comp.blockage - Math.min(100, comp.wear));
+  }
+
+  get flowRate() {
+    // Weighted average: nozzle blockage matters most
+    const weights = { filter:0.15, controlChamber:0.15, pressureChamber: 0.10, needleValve:0.30, nozzleTip:0.30 };
+    let totalRestriction = 0;
+    Object.entries(this.components).forEach(([key, comp]) => {
+      totalRestriction += (comp.blockage / 100) * (weights[key] || 0.20);
+    });
+    return Math.max(0, Math.round((1 - totalRestriction) * 100));
+  }
+
+  get injectorHealth() {
+    const weights = { filter:0.15, controlChamber:0.15, pressureChamber: 0.10, needleValve:0.30, nozzleTip:0.30 };
+    let totalHealth = 0;
+    Object.entries(this.components).forEach(([key, comp]) => {
+      totalHealth += comp.health * (weights[key] || 0.20);
+    });
+    return Math.max(0, Math.round(totalHealth));
+  }
+
+  get failureMode() {
+    const h = this.injectorHealth;
+    if (h > 85) return 'Healthy';
+    if (h > 75) return 'Early Contamination';
+    if (h > 60) return 'Deposit Formation';
+    if (h > 45) return 'Partial Blockage';
+    if (h > 30) return 'Performance Degradation';
+    if (h > 15) return 'Critical Failure';
+    return 'Injector Failure';
+  }
+
+  get severity() {
+    const h = this.injectorHealth;
+    if (h > 75) return 'green';
+    if (h > 50) return 'yellow';
+    if (h > 25) return 'orange';
+    return 'red';
+  }
+
+  get mostAffected() {
+    let worst = null, worstVal = 0;
+    Object.entries(this.components).forEach(([key, comp]) => {
+      const degradation = 100 - comp.health;
+      if (degradation > worstVal) { worst = key; worstVal = degradation; }
+    });
+    return worst;
+  }
+
+  reset() {
+    Object.values(this.components).forEach(comp => {
+      comp.blockage = 0;
+      comp.wear = 0;
+      comp.health = 100;
+      comp.contaminants = [];
+      comp.stuckCount = 0;
+    });
+    this.cycles = 0;
+    eventBus.emit('blockage:reset');
+  }
+}
+
+// --- ContaminationEngine ---
+class ContaminationEngine {
+  constructor() {
+    this.activeType = 'dust';
+    this.contaminationLevel = 40;    // 0–100
+    this.simulationSpeed = 1.0;      // 0.25–4.0
+    this.particleSize = 1.0;         // multiplier
+    this.running = false;
+    this.paused = false;
+    this.traceMode = false;
+    this.traceIndex = 0;
+    this.tracePaused = false;
+    this.traceT = 0;
+    this.simTime = 0;
+    this.particles = [];             // { t, speed, stuck, stuckAt, opacity }
+    this.blockage = new BlockageTracker();
+    this.maxParticles = qualityManager.config.maxParticles;
+
+    // InstancedMesh will be created in Milestone 3
+    this.instancedMesh = null;
+    this.colorAttr = null;
+    this.opacityAttr = null;
+    this.group = null;
+  }
+
+  get config() { return PARTICLE_LIBRARY[this.activeType]; }
+
+  setContaminant(type) {
+    if (PARTICLE_LIBRARY[type]) {
+      this.activeType = type;
+      eventBus.emit('contamination:typeChanged', { type });
+    }
+  }
+
+  setLevel(pct) {
+    this.contaminationLevel = Math.max(0, Math.min(100, pct));
+    eventBus.emit('contamination:levelChanged', { level: this.contaminationLevel });
+  }
+
+  setSpeed(multiplier) {
+    this.simulationSpeed = Math.max(0.25, Math.min(4, multiplier));
+  }
+
+  setSize(multiplier) {
+    this.particleSize = Math.max(0.5, Math.min(2.0, multiplier));
+  }
+
+  applyPreset(presetKey) {
+    const preset = SIMULATION_PRESETS[presetKey];
+    if (!preset) return;
+    this.reset();
+    this.activeType = preset.type;
+    this.contaminationLevel = preset.level;
+    eventBus.emit('contamination:presetApplied', { preset: presetKey });
+    if (preset.level > 0) this.start();
+  }
+
+  start() {
+    if (this.activeType === 'diesel' || this.contaminationLevel === 0) return;
+    this.running = true;
+    this.paused = false;
+    // Auto-activate fuel flow so contaminants flow within fuel
+    if (!state.flowActive) {
+      state.flowActive = true;
+      flowGroup.visible = true;
+      document.getElementById('tb-flow')?.classList.add('active');
+    }
+    this._spawnParticles();
+    eventBus.emit('contamination:started', { type: this.activeType, level: this.contaminationLevel });
+  }
+
+  pause() {
+    this.paused = !this.paused;
+    eventBus.emit('contamination:paused', { paused: this.paused });
+  }
+
+  reset() {
+    this.running = false;
+    this.paused = false;
+    this.simTime = 0;
+    this.particles = [];
+    this.traceMode = false;
+    this.blockage.reset();
+    // Clear contaminant visuals (Milestone 3 will handle InstancedMesh)
+    if (this.group) this.group.visible = false;
+    eventBus.emit('contamination:reset');
+  }
+
+  clean() {
+    if (!this.running && this.blockage.injectorHealth === 100) return;
+    this.running = false;
+    this.paused = false;
+    // Mark all particles for reverse flow (cleanup animation in Milestone 6)
+    this.particles.forEach(p => { p.cleaning = true; p.stuck = false; });
+    eventBus.emit('contamination:cleaning');
+  }
+
+  startTrace(contaminantType) {
+    this.traceMode = true;
+    this.traceIndex = 0;
+    this.traceT = 0;
+    this.tracePaused = false;
+    this.activeType = contaminantType || this.activeType;
+    if (!state.flowActive) {
+      state.flowActive = true;
+      flowGroup.visible = true;
+      document.getElementById('tb-flow')?.classList.add('active');
+    }
+    eventBus.emit('contamination:traceStarted', { type: this.activeType });
+  }
+
+  _spawnParticles() {
+    const count = Math.round((this.contaminationLevel / 100) * Math.min(60, this.maxParticles));
+    this.particles = [];
+    for (let i = 0; i < count; i++) {
+      this.particles.push({
+        t: Math.random() * 0.15,
+        speed: this.config.speed * (0.8 + Math.random() * 0.4),
+        stuck: false,
+        stuckAt: null,
+        depositOffset: null,
+        opacity: this.config.opacity,
+        cleaning: false,
+      });
+    }
+  }
+
+  update(dt) {
+    if (!this.running && !this.traceMode) return;
+    if (this.paused) return;
+
+    const adjustedDt = dt * this.simulationSpeed;
+    this.simTime += adjustedDt;
+    this.blockage.updateCycles(adjustedDt); // Simulate wear cycles
+
+    for (let i = 0; i < this.particles.length; i++) {
+      const p = this.particles[i];
+      if (p.stuck) continue;
+      if (p.cleaning) {
+        p.t -= adjustedDt * 0.3;
+        p.opacity = Math.max(0, p.opacity - adjustedDt * 0.5);
+        if (p.t <= 0 || p.opacity <= 0) { p.t = 0; p.opacity = 0; }
+        continue;
+      }
+
+      // Physics-based velocity calculation
+      let velocity = 0.18 * p.speed * (this.blockage.flowRate / 100);
+      velocity *= (1 / Math.sqrt(this.config.mass)); // heavier particles move slower
+      p.t += adjustedDt * velocity;
+
+      if (p.t <= 1.0) {
+        Object.entries(COMPONENT_VULNERABILITY).forEach(([compKey, zone]) => {
+          if (p.t >= zone.tStart && p.t <= zone.tEnd && zone.vulnerableTo.includes(this.activeType)) {
+            const compHealth = this.blockage.components[compKey].health;
+            
+            // Slow down in restricted/damaged zones
+            const restrictionFactor = Math.max(0.1, compHealth / 100);
+            p.t -= adjustedDt * velocity * (1 - restrictionFactor) * 0.8;
+
+            // Sticking probability based on adhesion and component damage
+            const damageFactor = 1 + ((100 - compHealth) / 50); // Up to 3x stickier when highly damaged
+            const stickProb = (this.config.adhesion * 0.5) * damageFactor * adjustedDt;
+
+            if (Math.random() < stickProb) {
+              p.stuck = true;
+              p.stuckAt = compKey;
+              // Generate persistent deposit scatter
+              p.depositOffset = new THREE.Vector3(
+                (Math.random() - 0.5) * 0.12,
+                (Math.random() - 0.5) * 0.12,
+                (Math.random() - 0.5) * 0.12
+              );
+              // Calculate blockage based on mass
+              const blockAmount = (this.config.mass * 0.5) / (zone.capacity / 40);
+              this.blockage.addBlockage(compKey, this.activeType, blockAmount);
+            }
+          }
+        });
+      }
+
+      // Wrap around if particle completes journey
+      if (p.t > 1.0) p.t -= 1.0;
+    }
+
+    // Check if cleaning is complete
+    if (this.particles.length > 0 && this.particles.every(p => p.cleaning && p.opacity <= 0)) {
+      this.particles = [];
+      this.blockage.reset();
+      eventBus.emit('contamination:cleaned');
+    }
+
+    // Update InstancedMesh
+    if (this.instancedMesh) {
+      const colorObj = new THREE.Color(this.config.color);
+      for (let i = 0; i < this.maxParticles; i++) {
+        if (i < this.particles.length) {
+          const p = this.particles[i];
+          const pt = flowCurve.getPointAt(Math.min(1.0, p.t));
+          _tempMatrix.makeTranslation(pt.x, pt.y, pt.z);
+          if (p.stuck && p.depositOffset) {
+            _tempMatrix.elements[12] += p.depositOffset.x;
+            _tempMatrix.elements[13] += p.depositOffset.y;
+            _tempMatrix.elements[14] += p.depositOffset.z;
+          }
+          const scale = this.config.size * this.particleSize * (1 / 0.055);
+          _tempMatrix.scale(new THREE.Vector3(scale, scale, scale));
+          this.instancedMesh.setMatrixAt(i, _tempMatrix);
+          this.colorAttr.setXYZ(i, colorObj.r, colorObj.g, colorObj.b);
+          this.opacityAttr.setX(i, p.opacity);
+        } else {
+          _tempMatrix.makeTranslation(0, 0, 0);
+          _tempMatrix.scale(new THREE.Vector3(0, 0, 0));
+          this.instancedMesh.setMatrixAt(i, _tempMatrix);
+          this.opacityAttr.setX(i, 0);
+        }
+      }
+      this.instancedMesh.instanceMatrix.needsUpdate = true;
+      this.colorAttr.needsUpdate = true;
+      this.opacityAttr.needsUpdate = true;
+    }
+
+    this._updateVisuals();
+    this._updateTrace(adjustedDt);
+
+    eventBus.emit('contamination:updated', {
+      particleCount: this.particles.filter(p => !p.stuck && !p.cleaning).length,
+      stuckCount: this.particles.filter(p => p.stuck).length,
+      flowRate: this.blockage.flowRate,
+      health: this.blockage.injectorHealth,
+      severity: this.blockage.severity,
+      failureMode: this.blockage.failureMode,
+      simTime: this.simTime,
+      mostAffected: this.blockage.mostAffected,
+    });
+  }
+
+  _updateVisuals() {
+    Object.entries(COMPONENT_VULNERABILITY).forEach(([compKey, cfg]) => {
+      const p = partsRegistry[cfg.partId];
+      // Do not overwrite hover state emissive
+      if (p && p.material && cfg.partId !== (typeof lastHovered !== 'undefined' ? lastHovered : null)) {
+        p.material.emissive.setHex(0x000000);
+        p.material.emissiveIntensity = 0;
+      }
+    });
+    if (typeof outlinePass !== 'undefined' && outlinePass) {
+      outlinePass.selectedObjects = [];
+    }
+    const mostAffectedKey = this.blockage.mostAffected;
+    if (mostAffectedKey && this.blockage.components[mostAffectedKey].blockage > 25) {
+      const severityColor = new THREE.Color(SEVERITY_COLORS[this.blockage.severity] || 0x22C55E);
+      const p = partsRegistry[COMPONENT_VULNERABILITY[mostAffectedKey].partId];
+      if (p && p.material && COMPONENT_VULNERABILITY[mostAffectedKey].partId !== (typeof lastHovered !== 'undefined' ? lastHovered : null)) {
+        const pulse = 0.5 + Math.sin(this.simTime * 5) * 0.5;
+        p.material.emissive.copy(severityColor);
+        p.material.emissiveIntensity = pulse * 0.8;
+      }
+      if (typeof outlinePass !== 'undefined' && outlinePass && this.blockage.severity !== 'green') {
+        outlinePass.visibleEdgeColor.copy(severityColor);
+        outlinePass.hiddenEdgeColor.copy(severityColor);
+        outlinePass.selectedObjects = p ? [p.mesh] : [];
+      }
+    }
+  }
+
+  _updateTrace(dt) {
+    if (!this.traceMode) return;
+    
+    if (!this.tracePaused) {
+      this.traceT += dt * 0.1 * this.config.speed;
+    }
+
+    // Follow camera logic
+    const pt = flowCurve.getPointAt(Math.min(1.0, this.traceT));
+    // Move camera to look at particle, slightly offset
+    const camOffset = new THREE.Vector3(2.5, 0.5, 2.5);
+    camera.position.lerp(pt.clone().add(camOffset), 0.1);
+    controls.target.lerp(pt, 0.1);
+
+    if (this.traceT >= 1.0) {
+      this.traceMode = false;
+      showToast('Particle journey complete.');
+      resetView();
+      return;
+    }
+
+    // Check stops
+    if (!this.tracePaused && this.traceIndex < JOURNEY_STOPS.length) {
+      const stop = JOURNEY_STOPS[this.traceIndex];
+      if (this.traceT >= stop.t) {
+        this.tracePaused = true;
+        this.traceIndex++;
+        // Show info
+        const html = `
+          <div class="ip-header">
+            <h3><i class="fa-solid fa-route"></i> ${stop.title}</h3>
+          </div>
+          <div class="ip-body">
+            <p>${stop.info}</p>
+            <div style="margin-top:12px;text-align:right;">
+              <button class="btn primary" onclick="contaminationEngine.tracePaused=false">Continue <i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+          </div>
+        `;
+        document.getElementById('info-panel').innerHTML = html;
+        document.getElementById('info-panel').classList.add('visible');
+      }
+    }
+  }
+}
+
+const contaminationEngine = new ContaminationEngine();
+
+// --- Setup Contaminant InstancedMesh ---
+(function setupContaminantVisuals() {
+  const max = contaminationEngine.maxParticles;
+  const geo = new THREE.SphereGeometry(0.055, 8, 8); // base size, scaled in update()
+  const mat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 1.0 });
+  const mesh = new THREE.InstancedMesh(geo, mat, max);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.renderOrder = 2; // render over normal fuel
+
+  const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(max * 3), 3);
+  const opacityAttr = new THREE.InstancedBufferAttribute(new Float32Array(max), 1);
+  colorAttr.setUsage(THREE.DynamicDrawUsage);
+  opacityAttr.setUsage(THREE.DynamicDrawUsage);
+  mesh.geometry.setAttribute('instanceColor', colorAttr);
+  mesh.geometry.setAttribute('instanceOpacity', opacityAttr);
+
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader.replace(
+      'void main() {',
+      'attribute vec3 instanceColor;\nattribute float instanceOpacity;\nvarying vec3 vInstanceColor;\nvarying float vInstanceOpacity;\nvoid main() {\nvInstanceColor = instanceColor;\nvInstanceOpacity = instanceOpacity;'
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      'varying vec3 vInstanceColor;\nvarying float vInstanceOpacity;\nvoid main() {'
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <output_fragment>',
+      '#include <output_fragment>\ngl_FragColor = vec4(vInstanceColor, vInstanceOpacity);'
+    );
+  };
+
+  const group = new THREE.Group();
+  group.add(mesh);
+  scene.add(group);
+  
+  // Attach to engine
+  contaminationEngine.instancedMesh = mesh;
+  contaminationEngine.colorAttr = colorAttr;
+  contaminationEngine.opacityAttr = opacityAttr;
+  contaminationEngine.group = group;
+})();
+
+/* ============================================================
+   5. STATE (V2.1: Proxy-wrapped reactive store)
+   - Emits 'state:changed' on eventBus for every property write
+   - Dead properties removed: hoveredId, learningActive
+   - Array properties (measurePoints) pass through on get;
+     only full reassignment (=) triggers an event, not .push()
+============================================================ */
+const _stateData = {
+  exploded:false,
+  autoRotate:false,
+  wireframe:false,
+  transparent:false,
+  crossSection:false,
+  labelsVisible:true,
+  measureMode:false,
+  flowActive:false,
+  selectedId:null,
+  learningStep:0,
+  measurePoints:[],
+};
+const state = new Proxy(_stateData, {
+  set(target, prop, value) {
+    const old = target[prop];
+    target[prop] = value;
+    if (old !== value) {
+      eventBus.emit('state:changed', { prop, old, value });
+    }
+    return true;
+  }
+});
+
+const clippingPlane = new THREE.Plane(new THREE.Vector3(1,0,0), 0);
+
+/* ============================================================
+   6. RESIZE
+============================================================ */
+function resizeRenderer(){
+  const w = viewerWrap.clientWidth;
+  const h = viewerWrap.clientHeight;
+  renderer.setSize(w, h, false);
+  if (composer) composer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resizeRenderer);
+
+/* ============================================================
+   7. RAYCASTING — hover & click
+============================================================ */
+const raycaster = new THREE.Raycaster();
+const pointerNDC = new THREE.Vector2();
+let lastHovered = null;
+
+function getPointerNDC(evt){
+  const rect = canvas.getBoundingClientRect();
+  const x = (evt.clientX ?? (evt.touches && evt.touches[0].clientX));
+  const y = (evt.clientY ?? (evt.touches && evt.touches[0].clientY));
+  pointerNDC.x = ((x - rect.left) / rect.width) * 2 - 1;
+  pointerNDC.y = -((y - rect.top) / rect.height) * 2 + 1;
+}
+
+let pointerMoved = false;
+
+canvas.addEventListener('pointermove', (evt) => {
+  getPointerNDC(evt);
+  pointerMoved = true;
+});
+
+canvas.addEventListener('pointerleave', () => {
+  pointerMoved = false;
+  if(lastHovered){
+    setHoverState(lastHovered, false);
+    lastHovered = null;
+    canvas.style.cursor = 'grab';
+  }
+});
+
+function performHoverRaycast() {
+  if (!pointerMoved) return;
+  pointerMoved = false;
+
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(clickableMeshes, false);
+
+  if(hits.length){
+    const id = hits[0].object.userData.partId;
+    if(lastHovered !== id){
+      if(lastHovered) setHoverState(lastHovered, false);
+      setHoverState(id, true);
+      lastHovered = id;
+      canvas.style.cursor = 'pointer';
+    }
+  } else if(lastHovered){
+    setHoverState(lastHovered, false);
+    lastHovered = null;
+    canvas.style.cursor = 'grab';
+  }
+}
+
+canvas.addEventListener('pointerdown', (evt) => {
+  if(state.measureMode){ handleMeasureClick(evt); return; }
+  getPointerNDC(evt);
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(clickableMeshes, false);
+  if(hits.length){
+    selectPart(hits[0].object.userData.partId);
+  }
+});
+
+function setHoverState(id, isHover){
+  const entry = partsRegistry[id];
+  if(!entry) return;
+  gsap.to(entry.mesh.scale, { x:isHover?1.06:1, y:isHover?1.06:1, z:isHover?1.06:1, duration:0.25, ease:'power2.out' });
+  entry.material.emissive = new THREE.Color(isHover ? 0x0091D8 : 0x000000);
+  entry.material.emissiveIntensity = isHover ? 0.55 : 0;
+  const row = document.querySelector(`.part-row[data-id="${id}"]`);
+  if(row) row.classList.toggle('hover-glow', isHover);
+}
+
+/* ============================================================
+   8. SELECT / FOCUS PART
+============================================================ */
+function selectPart(id){
+  if(!partsRegistry[id]) return;
+  state.selectedId = id;
+  const entry = partsRegistry[id];
+
+  // Camera focus
+  const worldPos = new THREE.Vector3();
+  entry.mesh.getWorldPosition(worldPos);
+  const dir = worldPos.clone().sub(new THREE.Vector3(0, BODY_CENTER_Y, 0)).normalize();
+  const focusDistance = 4.2;
+  const camTarget = worldPos.clone().add(dir.multiplyScalar(focusDistance)).add(new THREE.Vector3(1.5, 1.0, 2.0));
+
+  gsap.to(camera.position, { x:camTarget.x, y:camTarget.y, z:camTarget.z, duration:1.1, ease:'power3.inOut' });
+  gsap.to(controls.target, { x:worldPos.x, y:worldPos.y, z:worldPos.z, duration:1.1, ease:'power3.inOut', onUpdate:()=>controls.update() });
+
+  // Highlight / fade others
+  Object.values(partsRegistry).forEach(e => {
+    const isSelected = e.data.id === id;
+    gsap.to(e.material, { opacity:isSelected?1:0.22, duration:0.4 });
+    e.material.transparent = true;
+    e.material.emissive = new THREE.Color(isSelected ? 0xE2001A : 0x000000);
+    e.material.emissiveIntensity = isSelected ? 0.35 : 0;
+  });
+
+  renderInfoPanel(entry.data);
+  highlightSidebarRow(id);
+  updateLabelEmphasis(id);
+  if (outlinePass) outlinePass.selectedObjects = [entry.mesh];
+}
+
+function clearSelection(){
+  state.selectedId = null;
+  Object.values(partsRegistry).forEach(e => {
+    gsap.to(e.material, { opacity:1, duration:0.35 });
+    e.material.emissive = new THREE.Color(0x000000);
+    e.material.emissiveIntensity = 0;
+  });
+  document.getElementById('info-panel').classList.remove('visible');
+  setTimeout(()=>{
+    if(!state.selectedId){
+      document.getElementById('info-panel').innerHTML = `<div class="ip-empty"><i class="fa-solid fa-cube"></i><p>Select a component from the model or sidebar<br/>to view detailed engineering data.</p></div>`;
+    }
+  }, 400);
+  highlightSidebarRow(null);
+  updateLabelEmphasis(null);
+  if (outlinePass) outlinePass.selectedObjects = [];
+}
+
+/* ============================================================
+   9. INFO PANEL RENDER
+============================================================ */
+function renderInfoPanel(part){
+  const panel = document.getElementById('info-panel');
+  const info = part.info;
+  panel.innerHTML = `
+    <div class="ip-header">
+      <div>
+        <div class="ip-tag">COMPONENT DATA</div>
+        <div class="ip-title">${part.name}</div>
+      </div>
+      <button class="ip-close" id="ip-close-btn"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    ${ipField('fa-bullseye','Purpose', info.purpose)}
+    ${ipField('fa-gears','Function', info.func)}
+    ${ipField('fa-diagram-project','Working Principle', info.working)}
+    ${ipField('fa-cubes-stacked','Material', info.material)}
+    ${ipField('fa-industry','Bosch Engineering Description', info.bosch)}
+    ${ipField('fa-triangle-exclamation','Common Failure', info.failure)}
+    ${ipField('fa-screwdriver-wrench','Maintenance Tips', info.maintenance)}
+    ${ipField('fa-check-double','Application', info.application)}
+  `;
+  panel.classList.add('visible');
+  document.getElementById('ip-close-btn').addEventListener('click', clearSelection);
+}
+function ipField(icon, label, text){
+  return `<div class="ip-field"><h5><i class="fa-solid ${icon}"></i>${label}</h5><p>${text}</p></div>`;
+}
+
+/* ============================================================
+   10. SIDEBAR LIST
+============================================================ */
+const partsListEl = document.getElementById('parts-list');
+function buildSidebar(filterText = ''){
+  partsListEl.innerHTML = '';
+  let visibleCount = 0;
+  PARTS.forEach(part => {
+    const match = partMatchesQuery(part, filterText);
+    if(match) visibleCount++;
+    const row = document.createElement('div');
+    row.className = 'part-row' + (match ? '' : ' dimmed');
+    row.dataset.id = part.id;
+    row.innerHTML = `<span class="dot"></span><span class="row-label">${part.name}</span>
+      <i class="fa-solid fa-eye vis-toggle" title="Hide / show component"></i>`;
+    row.addEventListener('click', (e) => {
+      if(e.target.classList.contains('vis-toggle')) return;
+      selectPart(part.id);
+    });
+    row.querySelector('.vis-toggle').addEventListener('click', (e) => {
+      e.stopPropagation();
+      togglePartVisibility(part.id, e.target);
+    });
+    partsListEl.appendChild(row);
+  });
+  document.getElementById('parts-count').textContent = visibleCount;
+}
+function highlightSidebarRow(id){
+  document.querySelectorAll('.part-row').forEach(r => r.classList.toggle('active', r.dataset.id === id));
+}
+function togglePartVisibility(id, iconEl){
+  const entry = partsRegistry[id];
+  entry.mesh.visible = !entry.mesh.visible;
+  iconEl.classList.toggle('fa-eye', entry.mesh.visible);
+  iconEl.classList.toggle('fa-eye-slash', !entry.mesh.visible);
+}
+buildSidebar();
+
+/* ---- Search ---- */
+const searchInput = document.getElementById('search-input');
+searchInput.addEventListener('input', (e) => {
+  const q = e.target.value.trim();
+  buildSidebar(q);
+  const matches = PARTS.filter(p => partMatchesQuery(p, q));
+  if(q && matches.length){
+    // Emphasize (but don't hard-select camera-jump) all matches; auto-select first for clarity
+    updateLabelEmphasis(matches.map(m=>m.id));
+    if(matches.length === 1) selectPart(matches[0].id);
+  } else if(!q){
+    updateLabelEmphasis(state.selectedId);
+  }
+});
+
+/* ============================================================
+   11. LABELS + LEADER LINES
+============================================================ */
+const labelsLayer = document.getElementById('labels-layer');
+const leaderSvg = document.getElementById('leader-lines');
+const labelEls = {};
+
+PARTS.forEach(part => {
+  const div = document.createElement('div');
+  div.className = 'part-label';
+  div.textContent = part.name;
+  labelsLayer.appendChild(div);
+  labelEls[part.id] = div;
+
+  const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+  leaderSvg.appendChild(line);
+  labelEls[part.id + '_line'] = line;
+});
+
+let labelEmphasisSet = null; // null = show all normally; array = only show these; string = only this one
+function updateLabelEmphasis(sel){
+  if(Array.isArray(sel)) labelEmphasisSet = sel;
+  else if(typeof sel === 'string') labelEmphasisSet = [sel];
+  else labelEmphasisSet = null;
+}
+
+const tmpVec = new THREE.Vector3();
+function updateLabels(){
+  if(!state.labelsVisible){
+    Object.keys(partsRegistry).forEach(id => labelEls[id].classList.remove('visible'));
+    return;
+  }
+  const camDist = camera.position.distanceTo(controls.target);
+  const showAllThreshold = 22; // hide when too zoomed out
+  const rect = viewerWrap.getBoundingClientRect();
+
+  Object.entries(partsRegistry).forEach(([id, entry]) => {
+    const label = labelEls[id];
+    const lineEl = labelEls[id + '_line'];
+    if(!entry.mesh.visible){ label.classList.remove('visible'); lineEl.setAttribute('opacity','0'); return; }
+
+    entry.mesh.getWorldPosition(tmpVec);
+    const projected = tmpVec.clone().project(camera);
+    const behindCamera = projected.z > 1;
+    const x = (projected.x * 0.5 + 0.5) * rect.width;
+    const y = (-projected.y * 0.5 + 0.5) * rect.height;
+
+    let shouldShow = !behindCamera && camDist < showAllThreshold && x > 0 && x < rect.width && y > 0 && y < rect.height;
+    if(labelEmphasisSet) shouldShow = shouldShow && labelEmphasisSet.includes(id);
+    if(state.selectedId) shouldShow = shouldShow && id === state.selectedId;
+
+    if(shouldShow){
+      const labelY = y - 46;
+      label.style.left = x + 'px';
+      label.style.top = labelY + 'px';
+      label.classList.add('visible');
+      lineEl.setAttribute('x1', x); lineEl.setAttribute('y1', labelY + 14);
+      lineEl.setAttribute('x2', x); lineEl.setAttribute('y2', y);
+      lineEl.setAttribute('opacity', '0.65');
+    } else {
+      label.classList.remove('visible');
+      lineEl.setAttribute('opacity','0');
+    }
+  });
+}
+
+/* ============================================================
+   12. EXPLODED VIEW
+============================================================ */
+function setExploded(active){
+  state.exploded = active;
+  Object.values(partsRegistry).forEach(entry => {
+    const target = active ? entry.originalPos.clone().add(entry.explodeVec) : entry.originalPos.clone();
+    gsap.to(entry.mesh.position, { x:target.x, y:target.y, z:target.z, duration:1.0, ease:'power3.inOut' });
+  });
+  document.querySelectorAll('#tb-exploded, #btn-exploded-hero').forEach(b => b.classList.toggle('active', active));
+  showToast(active ? 'Exploded view enabled' : 'Exploded view disabled');
+}
+
+/* ============================================================
+   13. VIEW MODES: wireframe / transparent / cross-section / measurement
+============================================================ */
+function toggleWireframe(){
+  state.wireframe = !state.wireframe;
+  Object.values(partsRegistry).forEach(e => e.material.wireframe = state.wireframe);
+  document.getElementById('tb-wireframe').classList.toggle('active', state.wireframe);
+  showToast('Wireframe mode ' + (state.wireframe ? 'on' : 'off'));
+}
+
+function toggleTransparent(){
+  state.transparent = !state.transparent;
+  Object.values(partsRegistry).forEach(e => {
+    e.material.transparent = true;
+    gsap.to(e.material, { opacity: state.transparent ? 0.35 : 1, duration:0.4 });
+  });
+  document.getElementById('tb-transparent').classList.toggle('active', state.transparent);
+  showToast('Transparent mode ' + (state.transparent ? 'on' : 'off'));
+}
+
+function toggleCrossSection(){
+  state.crossSection = !state.crossSection;
+  renderer.localClippingEnabled = state.crossSection;
+  Object.values(partsRegistry).forEach(e => {
+    e.material.clippingPlanes = state.crossSection ? [clippingPlane] : [];
+    e.material.needsUpdate = true;
+  });
+  document.getElementById('tb-crosssection').classList.toggle('active', state.crossSection);
+  showToast('Cross section mode ' + (state.crossSection ? 'on' : 'off'));
+}
+
+function toggleMeasureMode(){
+  state.measureMode = !state.measureMode;
+  state.measurePoints = [];
+  document.getElementById('tb-measure').classList.toggle('active', state.measureMode);
+  const readout = document.getElementById('crosshair-readout');
+  readout.style.display = state.measureMode ? 'block' : 'none';
+  readout.textContent = state.measureMode ? 'Click two points on the model to measure' : '';
+  showToast('Measurement mode ' + (state.measureMode ? 'on — click two points' : 'off'));
+}
+function handleMeasureClick(evt){
+  getPointerNDC(evt);
+  raycaster.setFromCamera(pointerNDC, camera);
+  const hits = raycaster.intersectObjects(clickableMeshes, false);
+  if(!hits.length) return;
+  state.measurePoints.push(hits[0].point.clone());
+  const readout = document.getElementById('crosshair-readout');
+  if(state.measurePoints.length === 1){
+    readout.textContent = 'Point 1 set — click a second point';
+  } else if(state.measurePoints.length === 2){
+    const d = state.measurePoints[0].distanceTo(state.measurePoints[1]);
+    readout.textContent = `Distance: ${(d*10).toFixed(1)} mm (scaled)`;
+    state.measurePoints = [];
+  }
+}
+
+function toggleLabels(){
+  state.labelsVisible = !state.labelsVisible;
+  document.getElementById('tb-labels').classList.toggle('active', state.labelsVisible);
+  showToast('Labels ' + (state.labelsVisible ? 'shown' : 'hidden'));
+}
+
+function toggleFuelFlow(){
+  state.flowActive = !state.flowActive;
+  flowGroup.visible = state.flowActive;
+  document.getElementById('tb-flow').classList.toggle('active', state.flowActive);
+  showToast('Fuel flow animation ' + (state.flowActive ? 'started' : 'stopped'));
+}
+
+/* ============================================================
+   14. AUTO ROTATE / RESET / FULLSCREEN / SCREENSHOT / THEME
+============================================================ */
+function toggleAutoRotate(){
+  state.autoRotate = !state.autoRotate;
+  controls.autoRotate = state.autoRotate;
+  controls.autoRotateSpeed = 1.4;
+  document.querySelectorAll('#tb-autorotate, #btn-autorotate-hero').forEach(b => b.classList.toggle('active', state.autoRotate));
+}
+
+function resetView(){
+  gsap.to(camera.position, { x:DEFAULT_CAM_POS.x, y:DEFAULT_CAM_POS.y, z:DEFAULT_CAM_POS.z, duration:1.1, ease:'power3.inOut' });
+  gsap.to(controls.target, { x:DEFAULT_TARGET.x, y:DEFAULT_TARGET.y, z:DEFAULT_TARGET.z, duration:1.1, ease:'power3.inOut', onUpdate:()=>controls.update() });
+  if(state.exploded) setExploded(false);
+  clearSelection();
+  showToast('View reset');
+}
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  } else {
+    document.exitFullscreen();
+  }
+}
+document.getElementById('fullscreen-toggle').addEventListener('click', toggleFullscreen);
+document.getElementById('tb-fullscreen').addEventListener('click', toggleFullscreen);
+
+function takeScreenshot(){
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/png');
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'bosch-injector-view.png';
+  a.click();
+  showToast('Screenshot saved');
+}
+
+function toggleTheme(){
+  document.body.classList.toggle('light-mode');
+  const icon = document.querySelector('#theme-toggle i');
+  const light = document.body.classList.contains('light-mode');
+  icon.classList.toggle('fa-moon', !light);
+  icon.classList.toggle('fa-sun', light);
+  scene.background = null;
+}
+
+/* ============================================================
+   15. TOAST
+============================================================ */
+let toastTimer;
+function showToast(msg){
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> toast.classList.remove('show'), 2200);
+}
+
+/* ============================================================
+   16. LEARNING MODE
+============================================================ */
+const lpDots = document.getElementById('lp-dots');
+LEARNING_STEPS.forEach((s, i) => {
+  const dot = document.createElement('div');
+  dot.className = 'step-dot' + (i===0 ? ' active' : '');
+  dot.addEventListener('click', () => goToLearningStep(i));
+  lpDots.appendChild(dot);
+});
+
+function goToLearningStep(i){
+  state.learningStep = i;
+  const step = LEARNING_STEPS[i];
+  document.getElementById('lp-eyebrow').textContent = `STEP ${i+1} / ${LEARNING_STEPS.length}`;
+  document.getElementById('lp-title').textContent = step.title;
+  document.getElementById('lp-desc').textContent = step.desc;
+  document.getElementById('lp-stepnum').textContent = i+1;
+  const iconEl = document.getElementById('lp-icon');
+  iconEl.className = 'fa-solid ' + step.icon;
+
+  document.querySelectorAll('.step-dot').forEach((d, idx) => {
+    d.classList.toggle('active', idx === i);
+    d.classList.toggle('done', idx < i);
+  });
+
+  // Reflect in the 3D view: scroll into view, fade non-relevant, focus camera on first relevant part
+  document.getElementById('explorer').scrollIntoView({ behavior:'smooth', block:'start' });
+  Object.values(partsRegistry).forEach(e => {
+    const relevant = step.partIds.includes(e.data.id);
+    e.material.transparent = true;
+    gsap.to(e.material, { opacity: relevant ? 1 : 0.18, duration:0.4 });
+    e.material.emissive = new THREE.Color(relevant ? 0x0091D8 : 0x000000);
+    e.material.emissiveIntensity = relevant ? 0.5 : 0;
+  });
+  updateLabelEmphasis(step.partIds);
+  highlightSidebarRow(step.partIds[0]);
+
+  if(step.partIds.length){
+    const first = partsRegistry[step.partIds[0]];
+    const worldPos = new THREE.Vector3();
+    first.mesh.getWorldPosition(worldPos);
+    const dir = worldPos.clone().sub(new THREE.Vector3(0, BODY_CENTER_Y, 0)).normalize();
+    const camTarget = worldPos.clone().add(dir.multiplyScalar(4.6)).add(new THREE.Vector3(1.2, 0.8, 1.6));
+    gsap.to(camera.position, { x:camTarget.x, y:camTarget.y, z:camTarget.z, duration:1.0, ease:'power3.inOut' });
+    gsap.to(controls.target, { x:worldPos.x, y:worldPos.y, z:worldPos.z, duration:1.0, ease:'power3.inOut', onUpdate:()=>controls.update() });
+  }
+
+  // Trigger fuel flow visualization for relevant steps
+  flowGroup.visible = true;
+  state.flowActive = true;
+  document.getElementById('tb-flow').classList.add('active');
+}
+
+document.getElementById('lp-next').addEventListener('click', () => {
+  goToLearningStep((state.learningStep + 1) % LEARNING_STEPS.length);
+});
+document.getElementById('lp-prev').addEventListener('click', () => {
+  goToLearningStep((state.learningStep - 1 + LEARNING_STEPS.length) % LEARNING_STEPS.length);
+});
+
+let learningPlayInterval = null;
+document.getElementById('lp-play').addEventListener('click', (e) => {
+  const btn = e.currentTarget;
+  if(learningPlayInterval){
+    clearInterval(learningPlayInterval);
+    learningPlayInterval = null;
+    btn.innerHTML = '<i class="fa-solid fa-play"></i> Play Sequence';
+  } else {
+    btn.innerHTML = '<i class="fa-solid fa-pause"></i> Pause';
+    learningPlayInterval = setInterval(() => {
+      const next = (state.learningStep + 1) % LEARNING_STEPS.length;
+      goToLearningStep(next);
+      if(next === LEARNING_STEPS.length - 1){
+        clearInterval(learningPlayInterval);
+        learningPlayInterval = null;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Play Sequence';
+      }
+    }, 3200);
+  }
+});
+goToLearningStep(0);
+
+/* ============================================================
+   17. BUTTON WIRING
+============================================================ */
+document.getElementById('btn-explore').addEventListener('click', () => {
+  document.getElementById('explorer').scrollIntoView({ behavior:'smooth' });
+});
+document.getElementById('btn-exploded-hero').addEventListener('click', () => setExploded(!state.exploded));
+document.getElementById('tb-exploded').addEventListener('click', () => setExploded(!state.exploded));
+document.getElementById('btn-reset-hero').addEventListener('click', resetView);
+document.getElementById('tb-reset').addEventListener('click', resetView);
+document.getElementById('btn-autorotate-hero').addEventListener('click', toggleAutoRotate);
+document.getElementById('tb-autorotate').addEventListener('click', toggleAutoRotate);
+document.getElementById('tb-labels').addEventListener('click', toggleLabels);
+document.getElementById('tb-wireframe').addEventListener('click', toggleWireframe);
+document.getElementById('tb-transparent').addEventListener('click', toggleTransparent);
+document.getElementById('tb-crosssection').addEventListener('click', toggleCrossSection);
+document.getElementById('tb-measure').addEventListener('click', toggleMeasureMode);
+document.getElementById('tb-flow').addEventListener('click', toggleFuelFlow);
+document.getElementById('tb-screenshot').addEventListener('click', takeScreenshot);
+document.getElementById('theme-toggle').addEventListener('click', toggleTheme);
+// Set defaults
+document.getElementById('tb-labels').classList.add('active');
+
+/* ============================================================
+   17b. CONTAMINATION PANEL WIRING
+============================================================ */
+// Toggle panel open/close
+function toggleContamPanel(){
+  const panel = document.getElementById('contam-panel');
+  const isOpen = panel.classList.toggle('open');
+  document.getElementById('tb-contamination').classList.toggle('active', isOpen);
+  if (isOpen) showToast('Contamination Simulator opened');
+}
+document.getElementById('tb-contamination').addEventListener('click', toggleContamPanel);
+document.getElementById('cp-close').addEventListener('click', toggleContamPanel);
+
+// Populate presets
+(function buildPresets(){
+  const container = document.getElementById('cp-presets');
+  Object.entries(SIMULATION_PRESETS).forEach(([key, preset]) => {
+    const btn = document.createElement('button');
+    btn.className = 'cp-preset';
+    btn.dataset.preset = key;
+    btn.innerHTML = `<i class="fa-solid ${preset.icon}" style="color:${preset.color}"></i>${preset.name.split(' ')[0]}`;
+    btn.addEventListener('click', () => {
+      container.querySelectorAll('.cp-preset').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      contaminationEngine.applyPreset(key);
+      // Sync slider UI
+      document.getElementById('cp-level').value = contaminationEngine.contaminationLevel;
+      document.getElementById('cp-level-val').textContent = contaminationEngine.contaminationLevel + '%';
+      showToast(preset.name + ' — ' + preset.desc);
+    });
+    container.appendChild(btn);
+  });
+})();
+
+// Sliders
+document.getElementById('cp-size').addEventListener('input', (e) => {
+  const v = e.target.value / 100;
+  contaminationEngine.setSize(v);
+  document.getElementById('cp-size-val').textContent = v.toFixed(1) + '×';
+});
+document.getElementById('cp-level').addEventListener('input', (e) => {
+  contaminationEngine.setLevel(parseInt(e.target.value));
+  document.getElementById('cp-level-val').textContent = e.target.value + '%';
+});
+document.getElementById('cp-speed').addEventListener('input', (e) => {
+  const v = e.target.value / 100;
+  contaminationEngine.setSpeed(v);
+  document.getElementById('cp-speed-val').textContent = v.toFixed(1) + '×';
+});
+
+// Control buttons
+document.getElementById('cp-start').addEventListener('click', () => {
+  contaminationEngine.start();
+  showToast('Contamination simulation started');
+});
+document.getElementById('cp-pause').addEventListener('click', () => {
+  contaminationEngine.pause();
+  showToast(contaminationEngine.paused ? 'Simulation paused' : 'Simulation resumed');
+});
+document.getElementById('cp-reset').addEventListener('click', () => {
+  contaminationEngine.reset();
+  updateContamDashboard({ particleCount:0, stuckCount:0, flowRate:100, health:100, severity:'green', failureMode:'Normal Operation', simTime:0, mostAffected:null });
+  showToast('Simulation reset');
+});
+document.getElementById('cp-clean').addEventListener('click', () => {
+  contaminationEngine.clean();
+  showToast('Cleaning injector…');
+});
+document.getElementById('cp-trace').addEventListener('click', () => {
+  contaminationEngine.startTrace();
+  showToast('Particle journey started — follow the contaminant');
+});
+
+// Dashboard updates via EventBus
+const SEVERITY_COLORS = { green:'#22C55E', yellow:'#EAB308', orange:'#EA580C', red:'#DC2626' };
+
+function updateContamDashboard(data) {
+  document.getElementById('cp-d-particles').textContent = data.particleCount + (data.stuckCount ? ' (+' + data.stuckCount + ' stuck)' : '');
+  document.getElementById('cp-d-flow').textContent = data.flowRate + '%';
+  document.getElementById('cp-d-blockage').textContent = (100 - data.flowRate) + '%';
+  const healthEl = document.getElementById('cp-d-health');
+  healthEl.textContent = data.health + '%';
+  healthEl.style.color = SEVERITY_COLORS[data.severity] || '#22C55E';
+  document.getElementById('cp-d-mode').textContent = data.failureMode;
+  const fill = document.getElementById('cp-health-fill');
+  fill.style.width = data.health + '%';
+  fill.style.background = SEVERITY_COLORS[data.severity] || '#22C55E';
+
+  // Affected component
+  if (data.mostAffected) {
+    const vuln = COMPONENT_VULNERABILITY[data.mostAffected];
+    const partData = vuln ? PARTS.find(p => p.id === vuln.partId) : null;
+    document.getElementById('cp-d-affected').textContent = partData ? partData.name : data.mostAffected;
+  } else {
+    document.getElementById('cp-d-affected').textContent = '—';
+  }
+
+  // Sim time
+  const mins = Math.floor(data.simTime / 60);
+  const secs = Math.floor(data.simTime % 60);
+  document.getElementById('cp-d-time').textContent = String(mins).padStart(2,'0') + ':' + String(secs).padStart(2,'0');
+}
+
+eventBus.on('contamination:updated', updateContamDashboard);
+eventBus.on('contamination:cleaned', () => {
+  updateContamDashboard({ particleCount:0, stuckCount:0, flowRate:100, health:100, severity:'green', failureMode:'Normal Operation', simTime:0, mostAffected:null });
+  showToast('Injector cleaned — health restored');
+});
+
+/* ============================================================
+   18. HERO BACKGROUND PARTICLES (2D canvas)
+============================================================ */
+(function initHeroParticles(){
+  const c = document.getElementById('bg-particles');
+  const ctx = c.getContext('2d');
+  let particles = [];
+  function resize(){
+    c.width = c.parentElement.clientWidth;
+    c.height = c.parentElement.clientHeight;
+    const count = Math.floor((c.width * c.height) / 14000);
+    particles = Array.from({length:count}, () => ({
+      x: Math.random()*c.width, y: Math.random()*c.height,
+      r: Math.random()*1.8 + 0.4,
+      vx: (Math.random()-0.5)*0.25, vy: (Math.random()-0.5)*0.25,
+      hueBlue: Math.random() > 0.15,
+    }));
+  }
+  function tick(){
+    ctx.clearRect(0,0,c.width,c.height);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if(p.x < 0 || p.x > c.width) p.vx *= -1;
+      if(p.y < 0 || p.y > c.height) p.vy *= -1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fillStyle = p.hueBlue ? 'rgba(63,193,255,0.55)' : 'rgba(226,0,26,0.5)';
+      ctx.fill();
+    });
+    requestAnimationFrame(tick);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+  tick();
+})();
+
+/* ============================================================
+   19. MAIN ANIMATION LOOP
+============================================================ */
+const clock = new THREE.Clock();
+
+function animateFuelFlow(dt){
+  if(!state.flowActive) return;
+
+  // --- Flow particles: update instance data + buffers ---
+  for (let i = 0; i < FLOW_COUNT; i++) {
+    const inst = flowInstances[i];
+    inst.t += dt * 0.18;
+    if (inst.t > 1) inst.t -= 1;
+    const pt = flowCurve.getPointAt(inst.t);
+    _tempMatrix.makeTranslation(pt.x, pt.y, pt.z);
+    flowInstancedMesh.setMatrixAt(i, _tempMatrix);
+    const pulse = 0.75 + Math.sin(inst.t * Math.PI * 2 * 3) * 0.25;
+    flowOpacityAttr.setX(i, pulse);
+  }
+  flowInstancedMesh.instanceMatrix.needsUpdate = true;
+  flowOpacityAttr.needsUpdate = true;
+
+  const healthFactor = (typeof contaminationEngine !== 'undefined') ? contaminationEngine.blockage.injectorHealth / 100 : 1;
+
+  // --- Spray particles: update instance data + buffers ---
+  for (let i = 0; i < SPRAY_COUNT; i++) {
+    const inst = sprayInstances[i];
+    inst.life += dt * 0.9;
+    if (inst.life > 1) {
+      inst.life = 0;
+      inst.angle = Math.random() * Math.PI * 2;
+    }
+    const spread = inst.life * inst.speed * (0.4 + 0.6 * healthFactor);
+    const x = Math.cos(inst.angle) * spread * 0.6;
+    const y = -inst.life * 1.1;
+    const z = Math.sin(inst.angle) * spread * 0.6;
+    _tempMatrix.makeTranslation(x, y, z);
+    sprayInstancedMesh.setMatrixAt(i, _tempMatrix);
+    sprayOpacityAttr.setX(i, Math.max(0, 0.8 - inst.life) * healthFactor);
+  }
+  sprayInstancedMesh.instanceMatrix.needsUpdate = true;
+  sprayOpacityAttr.needsUpdate = true;
+}
+
+function animateNeedle(t){
+  // subtle idle animation: needle assembly gently pulses to suggest operation, only when not exploded/selected
+  if(state.exploded || state.selectedId) return;
+  const needle = partsRegistry['needleValve'];
+  const armature = partsRegistry['armature'];
+  const ball = partsRegistry['valveBall'];
+  if(!needle) return;
+  
+  const healthFactor = (typeof contaminationEngine !== 'undefined') ? contaminationEngine.blockage.injectorHealth / 100 : 1;
+  const lift = state.flowActive ? Math.max(0, Math.sin(t*3)) * 0.06 * healthFactor : 0;
+  
+  needle.mesh.position.y = needle.originalPos.y + lift;
+  if(armature) armature.mesh.position.y = armature.originalPos.y + lift * 0.5;
+  if(ball) ball.mesh.position.y = ball.originalPos.y + lift * 0.5;
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.getElapsedTime();
+
+  controls.update();
+  performHoverRaycast();
+  animateFuelFlow(dt);
+  contaminationEngine.update(dt);
+  animateNeedle(t);
+  updateLabels();
+
+  if (composer) {
+    composer.render();
+  } else {
+    renderer.render(scene, camera);
+  }
+}
+
+resizeRenderer();
+animate();
+
+/* Keep clipping plane aligned to camera-relative cross section for readability */
+setInterval(() => {
+  if(state.crossSection){
+    clippingPlane.normal.set(1,0,0);
+    clippingPlane.constant = 0;
+  }
+}, 500);
+
+/* ============================================================
+   20. INTRO REVEAL
+============================================================ */
+gsap.from('.hero-inner > *', { y:26, opacity:0, duration:0.9, stagger:0.12, ease:'power3.out', delay:0.15 });
+gsap.from(injectorGroup.scale, { x:0.001, y:0.001, z:0.001, duration:1.4, ease:'elastic.out(1,0.7)', delay:0.3 });
+
+</script>
+</body>
+</html>
