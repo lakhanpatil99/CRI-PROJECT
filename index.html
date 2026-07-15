@@ -408,7 +408,7 @@ body.light-mode #viewer-wrap{ background:radial-gradient(ellipse at 50% 30%, #df
      NAVIGATION
 ============================================================ -->
 <nav id="nav">
-  <div class="nav-logo"><span class="dot"></span>BOSCH<span style="font-weight:300; opacity:.6; letter-spacing:2px;">&nbsp;/&nbsp;INJECTOR LAB</span></div>
+  <div class="nav-logo"><img src="png-transparent-logo-bosch.png" alt="Bosch Logo" height="24" />BOSCH<span style="font-weight:300; opacity:.6; letter-spacing:2px;">&nbsp;/&nbsp;INJECTOR LAB</span></div>
   <div class="nav-links">
     <a href="#hero">Overview</a>
     <a href="#explorer">Explorer</a>
@@ -1361,11 +1361,11 @@ const PARTICLE_LIBRARY = {
 
 // --- Component Vulnerability Map ---
 const COMPONENT_VULNERABILITY = {
-  filter:         { tStart:0.10, tEnd:0.20, partId:'filter',         vulnerableTo:['dust','rust','metal'],  capacity:100, baseWear:0.5 },
-  controlChamber: { tStart:0.25, tEnd:0.40, partId:'controlChamber', vulnerableTo:['dust','carbon','water', 'air'], capacity:80, baseWear:0.2 },
-  pressureChamber:{ tStart:0.45, tEnd:0.55, partId:'pressureChamber',vulnerableTo:['water','air'],          capacity:50,  baseWear:0.1 },
-  needleValve:    { tStart:0.55, tEnd:0.70, partId:'needleValve',    vulnerableTo:['carbon','rust','water'],capacity:60,  baseWear:0.2 },
-  nozzleTip:      { tStart:0.80, tEnd:0.95, partId:'nozzleTip',      vulnerableTo:['carbon','metal'],       capacity:40,  baseWear:0.4 },
+  filter:         { tStart:0.10, tEnd:0.20, partId:'filter',         vulnerableTo:['dust','rust','metal'], capacity:100, baseWear:0.5 },
+  controlChamber: { tStart:0.25, tEnd:0.40, partId:'controlChamber', vulnerableTo:['water', 'air'],        capacity:80,  baseWear:0.2 },
+  pressureChamber:{ tStart:0.45, tEnd:0.55, partId:'pressureChamber',vulnerableTo:['water'],               capacity:50,  baseWear:0.1 },
+  needleValve:    { tStart:0.55, tEnd:0.70, partId:'needleValve',    vulnerableTo:['carbon','rust'],       capacity:60,  baseWear:0.2 },
+  nozzleTip:      { tStart:0.80, tEnd:0.95, partId:'nozzleTip',      vulnerableTo:['carbon','metal'],      capacity:40,  baseWear:0.4 },
 };
 
 // --- Simulation Presets ---
@@ -1412,13 +1412,39 @@ const CONTAMINATION_EFFECTS = {
   'nozzleTip+metal':       { symptom:'Hole erosion, asymmetric spray, power loss', physics:'Hard metal shavings score and permanently enlarge spray holes.', maintenance:'Immediate nozzle replacement — irreversible damage' },
 };
 
-// --- BlockageTracker ---
+// --- BlockageTracker & Component Health Models (Release 3.1) ---
+const FAILURE_STAGES = [
+  { name: 'Healthy',                  minHealth: 86, color: '#22C55E', icon: 'fa-circle-check', severity: 'green' },
+  { name: 'Early Contamination',      minHealth: 76, color: '#84CC16', icon: 'fa-triangle-exclamation', severity: 'green' },
+  { name: 'Deposit Formation',        minHealth: 61, color: '#EAB308', icon: 'fa-layer-group', severity: 'yellow' },
+  { name: 'Partial Blockage',         minHealth: 46, color: '#F97316', icon: 'fa-ban', severity: 'orange' },
+  { name: 'Performance Degradation',  minHealth: 31, color: '#EF4444', icon: 'fa-chart-line-down', severity: 'red' },
+  { name: 'Critical Failure',         minHealth: 16, color: '#DC2626', icon: 'fa-skull-crossbones', severity: 'red' },
+  { name: 'Injector Failure',         minHealth: 0,  color: '#7F1D1D', icon: 'fa-circle-xmark', severity: 'red' },
+];
+
+function getStageForHealth(health) {
+  for (let stage of FAILURE_STAGES) {
+    if (health >= stage.minHealth) return stage;
+  }
+  return FAILURE_STAGES[FAILURE_STAGES.length - 1];
+}
+
 class BlockageTracker {
   constructor() {
     this.components = {};
     Object.entries(COMPONENT_VULNERABILITY).forEach(([key, cfg]) => {
       this.components[key] = { blockage:0, health:100, wear:0, capacity:cfg.capacity, contaminants:[], stuckCount:0 };
     });
+    
+    this.healthModels = {
+      filter:           { health: 100, stage: 'Healthy', color: '#22C55E' },
+      controlChamber:   { health: 100, stage: 'Healthy', color: '#22C55E' },
+      pressureChamber:  { health: 100, stage: 'Healthy', color: '#22C55E' },
+      needleValve:      { health: 100, stage: 'Healthy', color: '#22C55E' },
+      nozzleTip:        { health: 100, stage: 'Healthy', color: '#22C55E' },
+    };
+    
     this.cycles = 0; // Simulated cycles
   }
 
@@ -1452,44 +1478,54 @@ class BlockageTracker {
     const comp = this.components[key];
     // Health is 100 minus (blockage penalty + wear penalty)
     comp.health = Math.max(0, 100 - comp.blockage - Math.min(100, comp.wear));
+    
+    // Update subsystem health model
+    if (this.healthModels[key]) {
+      const hm = this.healthModels[key];
+      hm.health = Math.round(comp.health);
+      const stageObj = getStageForHealth(hm.health);
+      hm.stage = stageObj.name;
+      hm.color = stageObj.color;
+    }
   }
 
   get flowRate() {
-    // Weighted average: nozzle blockage matters most
-    const weights = { filter:0.15, controlChamber:0.15, pressureChamber: 0.10, needleValve:0.30, nozzleTip:0.30 };
-    let totalRestriction = 0;
-    Object.entries(this.components).forEach(([key, comp]) => {
-      totalRestriction += (comp.blockage / 100) * (weights[key] || 0.20);
+    // Multiplicative series logic: a 100% blockage anywhere stops all flow
+    let flowMultiplier = 1.0;
+    Object.values(this.components).forEach(comp => {
+      flowMultiplier *= Math.max(0, 1 - (comp.blockage / 100));
     });
-    return Math.max(0, Math.round((1 - totalRestriction) * 100));
+    return Math.max(0, Math.round(flowMultiplier * 100));
   }
 
   get injectorHealth() {
-    const weights = { filter:0.15, controlChamber:0.15, pressureChamber: 0.10, needleValve:0.30, nozzleTip:0.30 };
+    const weights = { filter:0.10, controlChamber:0.20, pressureChamber: 0.10, needleValve:0.30, nozzleTip:0.30 };
     let totalHealth = 0;
+    let worstHealth = 100;
     Object.entries(this.components).forEach(([key, comp]) => {
       totalHealth += comp.health * (weights[key] || 0.20);
+      if (comp.health < worstHealth) worstHealth = comp.health;
     });
-    return Math.max(0, Math.round(totalHealth));
+    // Blend weighted average with worst health (failure mode drag)
+    return Math.max(0, Math.round(totalHealth * 0.4 + worstHealth * 0.6));
   }
 
   get failureMode() {
-    const h = this.injectorHealth;
-    if (h > 85) return 'Healthy';
-    if (h > 75) return 'Early Contamination';
-    if (h > 60) return 'Deposit Formation';
-    if (h > 45) return 'Partial Blockage';
-    if (h > 30) return 'Performance Degradation';
-    if (h > 15) return 'Critical Failure';
-    return 'Injector Failure';
+    let worstStage = FAILURE_STAGES[0];
+    Object.values(this.healthModels).forEach(hm => {
+      const stage = getStageForHealth(hm.health);
+      if (stage.minHealth < worstStage.minHealth) worstStage = stage;
+    });
+    return worstStage.name;
   }
 
   get severity() {
-    const h = this.injectorHealth;
-    if (h > 75) return 'green';
-    if (h > 50) return 'yellow';
-    if (h > 25) return 'orange';
-    return 'red';
+    let worstStage = FAILURE_STAGES[0];
+    Object.values(this.healthModels).forEach(hm => {
+      const stage = getStageForHealth(hm.health);
+      if (stage.minHealth < worstStage.minHealth) worstStage = stage;
+    });
+    return worstStage.severity;
   }
 
   get mostAffected() {
@@ -1502,12 +1538,19 @@ class BlockageTracker {
   }
 
   reset() {
-    Object.values(this.components).forEach(comp => {
+    Object.keys(this.components).forEach(key => {
+      const comp = this.components[key];
       comp.blockage = 0;
       comp.wear = 0;
       comp.health = 100;
       comp.contaminants = [];
       comp.stuckCount = 0;
+      
+      if (this.healthModels[key]) {
+        this.healthModels[key].health = 100;
+        this.healthModels[key].stage = 'Healthy';
+        this.healthModels[key].color = '#22C55E';
+      }
     });
     this.cycles = 0;
     eventBus.emit('blockage:reset');
@@ -1673,9 +1716,14 @@ class ContaminationEngine {
             const restrictionFactor = Math.max(0.1, compHealth / 100);
             p.t -= adjustedDt * velocity * (1 - restrictionFactor) * 0.8;
 
-            // Sticking probability based on adhesion and component damage
+            // Sticking probability based on adhesion, blockage, and component damage
             const damageFactor = 1 + ((100 - compHealth) / 50); // Up to 3x stickier when highly damaged
-            const stickProb = (this.config.adhesion * 0.5) * damageFactor * adjustedDt;
+            let stickBase = Math.max(this.config.adhesion, this.config.blockageProb * 2);
+            let stickProb = stickBase * damageFactor * adjustedDt;
+            // The filter mechanically traps particles, vastly increasing stick probability
+            if (compKey === 'filter') {
+              stickProb *= 15.0; // Ensure dust/metal/rust get trapped here
+            }
 
             if (Math.random() < stickProb) {
               p.stuck = true;
@@ -1826,6 +1874,167 @@ class ContaminationEngine {
 }
 
 const contaminationEngine = new ContaminationEngine();
+
+// --- Engineering Behaviour Manager (Release 3.1) ---
+const ENGINEERING_BEHAVIOURS = {
+  carbon: {
+    needleValve: {
+      mechanism: 'Deposit formation on needle seat',
+      behaviour: (healthPct) => ({
+        needleStiction: healthPct < 70,
+        liftReduction: (100 - healthPct) * 0.003,
+        closingDelay: (100 - healthPct) * 0.5,
+        atomizationLoss: (100 - healthPct) * 0.8,
+      })
+    },
+    nozzleTip: {
+      mechanism: 'Coking of spray holes',
+      behaviour: (healthPct) => ({
+        holeRestriction: (100 - healthPct) * 1.0,
+        asymmetricSpray: healthPct < 50,
+        flowReduction: (100 - healthPct) * 0.9,
+      })
+    },
+  },
+  metal: {
+    filter: {
+      mechanism: 'Filter mesh damage and saturation',
+      behaviour: (healthPct) => ({
+        meshDamage: healthPct < 60,
+        passthrough: healthPct < 40,
+        flowRestriction: (100 - healthPct) * 1.2,
+      })
+    },
+    nozzleTip: {
+      mechanism: 'Hole erosion',
+      behaviour: (healthPct) => ({
+        asymmetricSpray: healthPct < 60,
+        flowReduction: (100 - healthPct) * 0.4,
+      })
+    }
+  },
+  rust: {
+    needleValve: {
+      mechanism: 'Surface roughening increases friction',
+      behaviour: (healthPct) => ({
+        frictionIncrease: (100 - healthPct) * 2.0,
+        injectionDelay: (100 - healthPct) * 0.3,
+        sealingDegradation: (100 - healthPct) * 0.5,
+      })
+    },
+  },
+  water: {
+    pressureChamber: {
+      mechanism: 'Incompressible fluid disrupts pressure balance',
+      behaviour: (healthPct) => ({
+        pressureOscillation: (100 - healthPct) * 15,
+        needleOscillation: healthPct < 60,
+        cavitationRisk: healthPct < 40,
+      })
+    },
+  },
+  air: {
+    controlChamber: {
+      mechanism: 'Compressible gas absorbs hydraulic force',
+      behaviour: (healthPct) => ({
+        compressibilityLoss: (100 - healthPct) * 0.8,
+        injectionInconsistency: healthPct < 70,
+        misfireRisk: healthPct < 40,
+      })
+    },
+  },
+  dust: {
+    filter: {
+      mechanism: 'Gradual filter blockage',
+      behaviour: (healthPct) => ({
+        flowRestriction: (100 - healthPct) * 0.6,
+        pressureDrop: (100 - healthPct) * 3,
+      })
+    },
+  },
+};
+
+class EngineeringBehaviourManager {
+  constructor(engine) {
+    this.engine = engine;
+  }
+  
+  getNeedleBehaviour() {
+    let stiction = false;
+    let liftReduction = 0;
+    let delay = 0;
+    let oscillation = false;
+    let healthPct = 100;
+    
+    if (this.engine && this.engine.blockage) {
+      const blockage = this.engine.blockage;
+      const nvHealth = blockage.healthModels.needleValve.health;
+      const nvContaminants = blockage.components.needleValve.contaminants;
+      healthPct = nvHealth;
+      
+      if (nvContaminants.includes('carbon')) {
+        const b = ENGINEERING_BEHAVIOURS.carbon.needleValve.behaviour(nvHealth);
+        stiction = stiction || b.needleStiction;
+        liftReduction += b.liftReduction;
+        delay += b.closingDelay;
+      }
+      
+      if (nvContaminants.includes('rust')) {
+        const b = ENGINEERING_BEHAVIOURS.rust.needleValve.behaviour(nvHealth);
+        delay += b.injectionDelay;
+      }
+      
+      const pcHealth = blockage.healthModels.pressureChamber.health;
+      const pcContaminants = blockage.components.pressureChamber.contaminants;
+      if (pcContaminants.includes('water')) {
+        const b = ENGINEERING_BEHAVIOURS.water.pressureChamber.behaviour(pcHealth);
+        oscillation = oscillation || b.needleOscillation;
+      }
+    }
+    return { stiction, liftReduction, delay, oscillation, healthPct };
+  }
+  
+  getSprayBehaviour() {
+    let asymmetry = false;
+    let atomizationLoss = 0;
+    let gaps = false;
+    let healthPct = 100;
+    
+    if (this.engine && this.engine.blockage) {
+      const blockage = this.engine.blockage;
+      const nzHealth = blockage.healthModels.nozzleTip.health;
+      const nzContaminants = blockage.components.nozzleTip.contaminants;
+      healthPct = nzHealth;
+      
+      if (nzContaminants.includes('carbon')) {
+        const b = ENGINEERING_BEHAVIOURS.carbon.nozzleTip.behaviour(nzHealth);
+        asymmetry = asymmetry || b.asymmetricSpray;
+      }
+      if (nzContaminants.includes('metal')) {
+        const b = ENGINEERING_BEHAVIOURS.metal.nozzleTip.behaviour(nzHealth);
+        asymmetry = asymmetry || b.asymmetricSpray;
+      }
+      
+      const nvHealth = blockage.healthModels.needleValve.health;
+      const nvContaminants = blockage.components.needleValve.contaminants;
+      if (nvContaminants.includes('carbon')) {
+        const b = ENGINEERING_BEHAVIOURS.carbon.needleValve.behaviour(nvHealth);
+        atomizationLoss += b.atomizationLoss;
+      }
+      
+      const ccHealth = blockage.healthModels.controlChamber.health;
+      const ccContaminants = blockage.components.controlChamber.contaminants;
+      if (ccContaminants.includes('air')) {
+        const b = ENGINEERING_BEHAVIOURS.air.controlChamber.behaviour(ccHealth);
+        gaps = gaps || b.misfireRisk;
+      }
+    }
+    
+    return { asymmetry, atomizationLoss, gaps, healthPct };
+  }
+}
+
+const engineeringBehaviourManager = new EngineeringBehaviourManager(contaminationEngine);
 
 // --- Setup Contaminant InstancedMesh ---
 (function setupContaminantVisuals() {
@@ -2602,7 +2811,11 @@ function animateFuelFlow(dt){
   flowInstancedMesh.instanceMatrix.needsUpdate = true;
   flowOpacityAttr.needsUpdate = true;
 
-  const healthFactor = (typeof contaminationEngine !== 'undefined') ? contaminationEngine.blockage.injectorHealth / 100 : 1;
+  let sprayB = { asymmetry: false, atomizationLoss: 0, gaps: false, healthPct: 100 };
+  if (typeof engineeringBehaviourManager !== 'undefined') {
+    sprayB = engineeringBehaviourManager.getSprayBehaviour();
+  }
+  const healthFactor = sprayB.healthPct / 100;
 
   // --- Spray particles: update instance data + buffers ---
   for (let i = 0; i < SPRAY_COUNT; i++) {
@@ -2612,28 +2825,62 @@ function animateFuelFlow(dt){
       inst.life = 0;
       inst.angle = Math.random() * Math.PI * 2;
     }
-    const spread = inst.life * inst.speed * (0.4 + 0.6 * healthFactor);
+    
+    // Simulate gaps (misfires)
+    let opacityMult = 1.0;
+    if (sprayB.gaps && Math.random() < 0.1) {
+      opacityMult = 0;
+    }
+    
+    // Simulate asymmetry (blocked holes)
+    if (sprayB.asymmetry) {
+      if (inst.angle > Math.PI && inst.angle < Math.PI * 1.5) {
+        opacityMult *= 0.2;
+      }
+    }
+    
+    const spreadMult = Math.max(0.2, 1.0 - sprayB.atomizationLoss / 100);
+    const spread = inst.life * inst.speed * (0.4 + 0.6 * healthFactor) * spreadMult;
+    
     const x = Math.cos(inst.angle) * spread * 0.6;
     const y = -inst.life * 1.1;
     const z = Math.sin(inst.angle) * spread * 0.6;
     _tempMatrix.makeTranslation(x, y, z);
     sprayInstancedMesh.setMatrixAt(i, _tempMatrix);
-    sprayOpacityAttr.setX(i, Math.max(0, 0.8 - inst.life) * healthFactor);
+    sprayOpacityAttr.setX(i, Math.max(0, 0.8 - inst.life) * healthFactor * opacityMult);
   }
   sprayInstancedMesh.instanceMatrix.needsUpdate = true;
   sprayOpacityAttr.needsUpdate = true;
 }
 
 function animateNeedle(t){
-  // subtle idle animation: needle assembly gently pulses to suggest operation, only when not exploded/selected
   if(state.exploded || state.selectedId) return;
   const needle = partsRegistry['needleValve'];
   const armature = partsRegistry['armature'];
   const ball = partsRegistry['valveBall'];
   if(!needle) return;
   
-  const healthFactor = (typeof contaminationEngine !== 'undefined') ? contaminationEngine.blockage.injectorHealth / 100 : 1;
-  const lift = state.flowActive ? Math.max(0, Math.sin(t*3)) * 0.06 * healthFactor : 0;
+  let lift = 0;
+  if (state.flowActive) {
+    if (typeof engineeringBehaviourManager !== 'undefined') {
+      const b = engineeringBehaviourManager.getNeedleBehaviour();
+      const healthFactor = b.healthPct / 100;
+      
+      let baseLift = Math.max(0, Math.sin((t - b.delay * 0.001) * 3));
+      
+      if (b.stiction) {
+         baseLift *= (0.5 + 0.5 * Math.sin(t * 15));
+      }
+      if (b.oscillation) {
+         baseLift += (Math.sin(t * 30) * 0.2);
+      }
+      baseLift = Math.max(0, baseLift);
+      lift = baseLift * Math.max(0, 0.06 - b.liftReduction);
+    } else {
+      const healthFactor = (typeof contaminationEngine !== 'undefined') ? contaminationEngine.blockage.injectorHealth / 100 : 1;
+      lift = Math.max(0, Math.sin(t*3)) * 0.06 * healthFactor;
+    }
+  }
   
   needle.mesh.position.y = needle.originalPos.y + lift;
   if(armature) armature.mesh.position.y = armature.originalPos.y + lift * 0.5;
